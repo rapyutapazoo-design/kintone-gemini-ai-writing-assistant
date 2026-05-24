@@ -1,0 +1,6 @@
+# Kintone Plugin Packaging
+dist/
+node_modules/
+
+# Secrets
+private.ppk

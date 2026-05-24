@@ -1,0 +1,30 @@
+<section class="settings">
+  <h2 class="settings-heading">Opinion Box プラグイン設定</h2>
+  <p class="kintoneplugin-desc">Geminiを利用するための通信設定情報（APIキー、モデル名）を入力してください。</p>
+  <form class="js-submit-settings">
+
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">Gemini APIキー<span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">
+        Google AI Studio等で取得したAPIキーを入力してください。<br>
+        <span style="color:red; font-size:12px;">※ セキュリティのため、保存済みのキーは表示されません。変更時・初回設定時に必ず入力してください。</span>
+      </div>
+      <div class="kintoneplugin-input-outer">
+        <input type="password" class="js-text-apikey kintoneplugin-input-text" required placeholder="APIキーを入力">
+      </div>
+    </div>
+
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">Gemini モデル名<span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">利用するAIのモデル名を入力してください。（デフォルト: gemini-2.5-flash）</div>
+      <div class="kintoneplugin-input-outer">
+        <input type="text" class="js-text-model kintoneplugin-input-text" required value="gemini-2.5-flash">
+      </div>
+    </div>
+
+    <div class="kintoneplugin-row">
+      <button type="button" class="js-cancel-button kintoneplugin-button-dialog-cancel">キャンセル</button>
+      <button type="submit" class="kintoneplugin-button-dialog-ok">保存</button>
+    </div>
+  </form>
+</section>

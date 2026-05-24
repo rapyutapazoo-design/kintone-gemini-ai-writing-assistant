@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kintone/js-sdk/%40kintone/plugin-manifest-validator%4010.2.0/packages/plugin-manifest-validator/manifest-schema.json",
+  "manifest_version": 1,
+  "version": 1,
+  "type": "APP",
+  "desktop": {
+    "js": [
+      "js/desktop.js"
+    ],
+    "css": [
+      "css/51-modern-default.css",
+      "css/desktop.css"
+    ]
+  },
+  "icon": "image/icon.png",
+  "config": {
+    "html": "html/config.html",
+    "js": [
+      "js/config.js"
+    ],
+    "css": [
+      "css/51-modern-default.css",
+      "css/config.css"
+    ],
+    "required_params": [
+      "gemini_model"
+    ]
+  },
+  "name": {
+    "en": "opinion-box-plugin",
+    "ja": "Opinion Box プラグイン"
+  },
+  "description": {
+    "en": "opinion-box-plugin",
+    "ja": "Opinion Box の生成AI機能をセキュアに利用するためのプラグイン"
+  },
+  "mobile": {
+    "js": [
+      "js/desktop.js"
+    ],
+    "css": [
+      "css/desktop.css"
+    ]
+  }
+}

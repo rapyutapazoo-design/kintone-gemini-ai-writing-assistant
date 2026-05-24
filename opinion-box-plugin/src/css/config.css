@@ -1,0 +1,22 @@
+.settings {
+  padding: 20px;
+}
+
+.kintoneplugin-row {
+  margin-bottom: 25px;
+}
+
+.kintoneplugin-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.kintoneplugin-require {
+  color: #e50000;
+  margin-left: 5px;
+}
+
+.js-text-apikey,
+.js-text-model {
+  width: 400px;
+}
