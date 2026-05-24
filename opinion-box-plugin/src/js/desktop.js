@@ -150,7 +150,7 @@
     showSpinner();
 
     try {
-      const rawText = await callGeminiAPI(prompt);
+      const rawText = await callGeminiAPI(prompt, true);
       const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       const data = JSON.parse(cleanText);
 
@@ -174,12 +174,12 @@
 
     if (!opinion) { alert("「意見内容」が空のため要約できません。"); return; }
 
-    const prompt = `あなたはマンション管理組合の理事会資料作成担当です。\n以下の意見書の内容を、理事会資料として適切な長さに要約してください。\n\n【要約のルール】\n1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。\n2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。\n3. 冗長な表現は避け、事実関係を明確にしてください。\n\n【本文】\n${opinion}`;
+    const prompt = `あなたはマンション管理組合の理事会資料作成担当です。\n以下の意見書の内容を、理事会資料として適切な長さに要約してください。\n\n【要約のルール】\n1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。\n2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。\n3. 冗長な表現は避け、事実関係を明確にしてください。\n4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。\n\n【本文】\n${opinion}`;
 
     showSpinner();
 
     try {
-      const resultText = await callGeminiAPI(prompt);
+      const resultText = await callGeminiAPI(prompt, false);
       const body = { app: appId, id: recordId, record: { ai_summary: { value: resultText } } };
       await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body);
       alert('要約が完了しました。ページを更新します。');
@@ -192,16 +192,17 @@
     }
   }
 
-  function callGeminiAPI(prompt) {
+  function callGeminiAPI(prompt, requireJson = true) {
     return new Promise((resolve, reject) => {
       // kintoneプロキシ経由でのリクエストURL
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
       const data = { 
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
+        contents: [{ parts: [{ text: prompt }] }]
       };
+      
+      if (requireJson) {
+        data.generationConfig = { responseMimeType: "application/json" };
+      }
 
       // headerのx-goog-api-keyはプロキシ設定側で自動的に付与されます
       kintone.plugin.app.proxy(
