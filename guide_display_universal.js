@@ -34,11 +34,16 @@
                 <div style="margin-bottom: 10px;">
                     <strong>② 内容の入力（AI利用も可）：</strong><br>
                     ご自身で手入力するか、AIに下書きさせることも可能です。<br>
-                    <div style="margin-top: 6px; padding: 8px; background-color: #fff0f0; border-left: 4px solid #d32f2f; border-radius: 2px;">
-                        <strong style="color: #d32f2f;">⚠️ 重要：AIを使う場合の手順</strong><br>
+                    <div style="margin-top: 6px; padding: 8px; background-color: #eef4fc; border-left: 4px solid #2062bf; border-radius: 2px;">
+                        <strong style="color: #2062bf;">💡 AIを使う場合の手順</strong><br>
                         1. 先に<strong>「AIへの指示・メモ」</strong>を入力する<br>
                         2. その後、${ICONS.GEMINI_BTN} ボタンを押す
                     </div>
+                </div>
+                <div style="margin-bottom: 10px; padding: 10px; background-color: #fff0f0; border-left: 4px solid #d32f2f; border-radius: 2px;">
+                    <strong style="color: #d32f2f;">⚠️ 注意事項</strong><br>
+                    入力した内容は、文章生成のため<strong>外部のAIサービス（Google Gemini）に送信されます。</strong><br>
+                    氏名・住所・電話番号・部屋番号・口座情報などの<strong style="color: #d32f2f;">個人情報は入力しないでください。</strong>
                 </div>
                 <div>
                     <strong>③ 保存：</strong><br>
