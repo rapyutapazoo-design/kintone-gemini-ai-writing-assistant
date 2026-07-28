@@ -16,7 +16,73 @@
   margin-left: 5px;
 }
 
-.js-text-apikey,
-.js-text-model {
+#obp-api-key,
+#obp-model-manual,
+#obp-btn-label-draft,
+#obp-btn-label-summary {
   width: 400px;
+}
+
+#obp-model-select,
+#obp-field-input,
+#obp-field-length,
+#obp-field-subject,
+#obp-field-body,
+#obp-field-summary,
+#obp-space-draft,
+#obp-space-summary {
+  min-width: 320px;
+}
+
+#obp-prompt-draft,
+#obp-prompt-summary {
+  width: 100%;
+  max-width: 720px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.obp-banner {
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.obp-banner-info {
+  background: #eef4ff;
+  border: 1px solid #93b8ff;
+}
+
+.obp-banner-warn {
+  background: #fff6e5;
+  border: 1px solid #f0b429;
+}
+
+.obp-banner-error {
+  background: #ffecec;
+  border: 1px solid #e50000;
+}
+
+.obp-status-ok {
+  color: #0b8043;
+  font-weight: bold;
+}
+
+.obp-status-ng {
+  color: #e50000;
+  font-weight: bold;
+}
+
+.obp-status-warn {
+  color: #b06a00;
+  font-weight: bold;
+}
+
+.obp-status-loading {
+  color: #666;
+}
+
+#obp-summary-section {
+  border-left: 3px solid #ddd;
+  padding-left: 16px;
 }

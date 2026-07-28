@@ -1,9 +1,68 @@
 (function (PLUGIN_ID) {
-  "use strict";
+  'use strict';
 
-  // モデル名の取得
-  const config = kintone.plugin.app.getConfig(PLUGIN_ID);
-  const GEMINI_MODEL = config.gemini_model || "gemini-2.5-flash";
+  // 設定読み込み
+  const config = kintone.plugin.app.getConfig(PLUGIN_ID) || {};
+  const client = window.GeminiPluginClient;
+
+  const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
+以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
+【出力フォーマット】
+{ "subject": "件名(20文字以内)", "body": "本文" }
+【本文の条件】
+1. 文字数目安: {{lengthInstruction}}
+2. 挨拶文、署名は一切禁止。
+3. 「です・ます」調。
+【メモ】
+{{input}}`;
+
+  const DEFAULT_PROMPT_SUMMARY = `あなたはマンション管理組合の理事会資料作成担当です。
+以下の意見書の内容を、理事会資料として適切な長さに要約してください。
+
+【要約のルール】
+1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。
+2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。
+3. 冗長な表現は避け、事実関係を明確にしてください。
+4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。
+
+【本文】
+{{body}}`;
+
+  const GEMINI_MODEL = config.gemini_model || 'gemini-2.5-flash';
+  const F_INPUT = config.field_input || 'keyword_input';
+  const F_LENGTH =
+    config.field_length === undefined ? 'length_option' : config.field_length;
+  const F_SUBJECT =
+    config.field_subject === undefined
+      ? 'opinion_subject'
+      : config.field_subject;
+  const F_BODY = config.field_body || 'opinion_body';
+  const F_SUMMARY = config.field_summary || 'ai_summary';
+  const SPACE_DRAFT = config.space_draft || 'btn_space_draft';
+  const SPACE_SUMMARY = config.space_summary || 'btn_space_summary';
+  const SUMMARY_ON = (config.summary_enabled || 'yes') !== 'no';
+  const LABEL_DRAFT = config.btn_label_draft || 'Geminiで件名・本文を作成';
+  const LABEL_SUMMARY = config.btn_label_summary || 'Geminiで要約';
+  const PROMPT_DRAFT = config.prompt_draft || DEFAULT_PROMPT_DRAFT;
+  const PROMPT_SUMMARY = config.prompt_summary || DEFAULT_PROMPT_SUMMARY;
+
+  function renderTemplate(tpl, vars) {
+    return String(tpl).replace(/\{\{(\w+)\}\}/g, (m, key) =>
+      Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : m,
+    );
+  }
+
+  function readFieldValue(record, code) {
+    if (!code) return '';
+    if (!record[code]) {
+      throw new Error(
+        'フィールドコード「' +
+          code +
+          '」がこのアプリに存在しません。プラグイン設定を確認してください。',
+      );
+    }
+    return record[code].value || '';
+  }
 
   // =========================================================
   // 1. デザイン定義
@@ -92,39 +151,60 @@
   // =========================================================
   // 3. ボタン表示ロジック
   // =========================================================
-  const EVENTS_EDIT = ['app.record.create.show', 'app.record.edit.show', 'mobile.app.record.create.show', 'mobile.app.record.edit.show'];
-  const EVENTS_DETAIL = ['app.record.detail.show', 'mobile.app.record.detail.show'];
+  const EVENTS_EDIT = [
+    'app.record.create.show',
+    'app.record.edit.show',
+    'mobile.app.record.create.show',
+    'mobile.app.record.edit.show',
+  ];
+  const EVENTS_DETAIL = [
+    'app.record.detail.show',
+    'mobile.app.record.detail.show',
+  ];
 
   kintone.events.on(EVENTS_EDIT, function (event) {
     const isMobile = event.type.startsWith('mobile.');
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
-    const space = appManager.record.getSpaceElement('btn_space_draft');
+    const space = appManager.record.getSpaceElement(SPACE_DRAFT);
     if (!space) return;
     space.innerHTML = '';
 
     const btn = document.createElement('button');
-    btn.innerHTML = GEMINI_LOGO_SVG + 'Geminiで件名・本文を作成';
+    btn.innerHTML = GEMINI_LOGO_SVG + LABEL_DRAFT;
     btn.style = BTN_STYLE;
-    if (isMobile) { btn.style.width = "100%"; btn.style.marginBottom = "10px"; }
+    if (isMobile) {
+      btn.style.width = '100%';
+      btn.style.marginBottom = '10px';
+    }
 
-    btn.onclick = function (e) { e.preventDefault(); generateDraft(isMobile); };
+    btn.onclick = function (e) {
+      e.preventDefault();
+      generateDraft(isMobile);
+    };
     space.appendChild(btn);
   });
 
   kintone.events.on(EVENTS_DETAIL, function (event) {
+    if (!SUMMARY_ON) return;
     const isMobile = event.type.startsWith('mobile.');
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
-    const space = appManager.record.getSpaceElement('btn_space_summary');
+    const space = appManager.record.getSpaceElement(SPACE_SUMMARY);
     if (!space) return;
     space.innerHTML = '';
 
     const btnSummary = document.createElement('button');
-    btnSummary.innerHTML = GEMINI_LOGO_SVG + 'Geminiで要約';
+    btnSummary.innerHTML = GEMINI_LOGO_SVG + LABEL_SUMMARY;
     btnSummary.style = BTN_STYLE;
-    btnSummary.style.padding = "8px 16px";
-    if (isMobile) { btnSummary.style.width = "100%"; btnSummary.style.marginBottom = "10px"; }
+    btnSummary.style.padding = '8px 16px';
+    if (isMobile) {
+      btnSummary.style.width = '100%';
+      btnSummary.style.marginBottom = '10px';
+    }
 
-    btnSummary.onclick = function (e) { e.preventDefault(); generateSummary(event.record, isMobile); };
+    btnSummary.onclick = function (e) {
+      e.preventDefault();
+      generateSummary(event.record, isMobile);
+    };
     space.appendChild(btnSummary);
   });
 
@@ -134,110 +214,156 @@
   async function generateDraft(isMobile) {
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
     const recordData = appManager.record.get();
-    const keyword = recordData.record.keyword_input.value;
-    const lengthOption = recordData.record.length_option.value;
-
-    if (!keyword) { alert("「AIへの指示・メモ」を入力してください。"); return; }
-
-    let lengthInstruction = "200文字程度の簡潔な文章";
-    if (lengthOption) {
-      if (lengthOption.indexOf("400") !== -1) lengthInstruction = "400文字程度の標準的な文章";
-      if (lengthOption.indexOf("600") !== -1) lengthInstruction = "600文字程度の詳細な文章";
+    const keyword = readFieldValue(recordData.record, F_INPUT);
+    let lengthOption = '';
+    if (F_LENGTH) {
+      try {
+        lengthOption = readFieldValue(recordData.record, F_LENGTH);
+      } catch {
+        lengthOption = '';
+      }
     }
 
-    const prompt = `あなたはマンション管理組合への意見書作成システムです。\n以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。\n【出力フォーマット】\n{ "subject": "件名(20文字以内)", "body": "本文" }\n【本文の条件】\n1. 文字数目安: ${lengthInstruction}\n2. 挨拶文、署名は一切禁止。\n3. 「です・ます」調。\n【メモ】\n${keyword}`;
+    if (!keyword) {
+      alert('「AIへの指示・メモ」を入力してください。');
+      return;
+    }
+
+    let lengthInstruction = '200文字程度の簡潔な文章';
+    if (lengthOption) {
+      if (lengthOption.indexOf('400') !== -1)
+        lengthInstruction = '400文字程度の標準的な文章';
+      if (lengthOption.indexOf('600') !== -1)
+        lengthInstruction = '600文字程度の詳細な文章';
+    }
+
+    const prompt = renderTemplate(PROMPT_DRAFT, {
+      input: keyword,
+      lengthInstruction: lengthInstruction,
+    });
 
     showSpinner();
 
     try {
       const rawText = await callGeminiAPI(prompt, true);
-      const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const data = JSON.parse(cleanText);
+      const data = client.tryParseJsonPayload(rawText);
 
       const currentRecord = appManager.record.get();
-      currentRecord.record.opinion_body.value = data.body;
-      currentRecord.record.opinion_subject.value = data.subject;
+      readFieldValue(currentRecord.record, F_BODY);
+      currentRecord.record[F_BODY].value = data.body;
+      if (F_SUBJECT && currentRecord.record[F_SUBJECT]) {
+        currentRecord.record[F_SUBJECT].value = data.subject;
+      }
       appManager.record.set(currentRecord);
-
     } catch (error) {
       console.error(error);
-      alert("生成に失敗しました。\nAPIキーが設定されているか確認してください。\n" + error.message);
+      if (
+        (error.classified && error.classified.code === 'NOT_FOUND') ||
+        /404/.test(error.message)
+      ) {
+        alert(
+          '生成に失敗しました。選択中のモデル（' +
+            GEMINI_MODEL +
+            '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
+            error.message,
+        );
+      } else {
+        alert(
+          '生成に失敗しました。\nAPIキーが設定されているか確認してください。\n' +
+            error.message,
+        );
+      }
     } finally {
       hideSpinner();
     }
   }
 
   async function generateSummary(record, isMobile) {
-    const opinion = record.opinion_body.value;
+    const opinion = readFieldValue(record, F_BODY);
     const recordId = record.$id.value;
     const appId = (isMobile ? kintone.mobile.app : kintone.app).getId();
 
-    if (!opinion) { alert("「意見内容」が空のため要約できません。"); return; }
+    if (!opinion) {
+      alert('「意見内容」が空のため要約できません。');
+      return;
+    }
 
-    const prompt = `あなたはマンション管理組合の理事会資料作成担当です。\n以下の意見書の内容を、理事会資料として適切な長さに要約してください。\n\n【要約のルール】\n1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。\n2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。\n3. 冗長な表現は避け、事実関係を明確にしてください。\n4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。\n\n【本文】\n${opinion}`;
+    const prompt = renderTemplate(PROMPT_SUMMARY, { body: opinion });
 
     showSpinner();
 
     try {
       const resultText = await callGeminiAPI(prompt, false);
-      const body = { app: appId, id: recordId, record: { ai_summary: { value: resultText } } };
+      const body = { app: appId, id: recordId, record: {} };
+      body.record[F_SUMMARY] = { value: resultText };
       await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body);
       alert('要約が完了しました。ページを更新します。');
       location.reload();
     } catch (error) {
       console.error(error);
-      alert("要約に失敗しました。\nAPIキーが設定されているか確認してください。\n" + error.message);
+      if (
+        (error.classified && error.classified.code === 'NOT_FOUND') ||
+        /404/.test(error.message)
+      ) {
+        alert(
+          '要約に失敗しました。選択中のモデル（' +
+            GEMINI_MODEL +
+            '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
+            error.message,
+        );
+      } else {
+        alert(
+          '要約に失敗しました。\nAPIキーが設定されているか確認してください。\n' +
+            error.message,
+        );
+      }
     } finally {
       hideSpinner();
     }
   }
 
   function callGeminiAPI(prompt, requireJson = true) {
-    return new Promise((resolve, reject) => {
-      // kintoneプロキシ経由でのリクエストURL
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-      const data = { 
-        contents: [{ parts: [{ text: prompt }] }]
-      };
-      
-      if (requireJson) {
-        data.generationConfig = { responseMimeType: "application/json" };
-      }
+    // kintoneプロキシ経由でのリクエストURL
+    const url =
+      client.PROXY_POST_PREFIX +
+      client.stripModelPrefix(GEMINI_MODEL) +
+      ':generateContent';
+    const data = {
+      contents: [{ parts: [{ text: prompt }] }],
+    };
 
-      // headerのx-goog-api-keyはプロキシ設定側で自動的に付与されます
-      kintone.plugin.app.proxy(
+    if (requireJson) {
+      data.generationConfig = { responseMimeType: 'application/json' };
+    }
+
+    // headerのx-goog-api-keyはプロキシ設定側で自動的に付与されます
+    return client
+      .proxyRequest(
         PLUGIN_ID,
         url,
         'POST',
         { 'Content-Type': 'application/json' },
         data,
-        (body, status, headers) => {
-          if (status >= 200 && status < 300) {
-            try {
-              const json = JSON.parse(body);
-              if (json.candidates && json.candidates.length > 0) {
-                resolve(json.candidates[0].content.parts[0].text);
-              } else {
-                reject(new Error('AIからの応答が空でした。'));
-              }
-            } catch (e) {
-              reject(new Error('レスポンスの解析に失敗しました。'));
-            }
-          } else {
-            try {
-              const errorJson = JSON.parse(body);
-              const errMsg = errorJson.error ? errorJson.error.message : 'Unknown Error';
-              reject(new Error(`API Error ${status}: ${errMsg}`));
-            } catch (e) {
-              reject(new Error(`API Error ${status}`));
-            }
+      )
+      .then(({ status, body }) => {
+        if (status >= 200 && status < 300) {
+          let json;
+          try {
+            json = JSON.parse(body);
+          } catch {
+            throw new Error('レスポンスの解析に失敗しました。');
           }
-        },
-        (err) => {
-          reject(new Error('kintone proxy でエラーが発生しました。詳細: ' + err));
+          const text = client.extractText(json);
+          if (!text) {
+            throw new Error('AIからの応答が空でした。');
+          }
+          return text;
         }
-      );
-    });
+        const c = client.classifyError(status, client.safeParseJson(body));
+        const err = new Error('API Error ' + status + ': ' + c.message);
+        err.classified = c;
+        throw err;
+      });
   }
 
   // =========================================================
@@ -249,25 +375,30 @@
     overlay.id = 'kintone-spinner-overlay';
     const container = document.createElement('div');
     container.className = 'spinner-container';
-    const ring = document.createElement('div'); ring.className = 'spinner-ring';
+    const ring = document.createElement('div');
+    ring.className = 'spinner-ring';
     const star = document.createElement('div');
-    star.className = 'spinner-star'; star.innerHTML = '✦';
+    star.className = 'spinner-star';
+    star.innerHTML = '✦';
 
     for (let i = 0; i < 6; i++) {
       const sparkle = document.createElement('div');
       sparkle.className = 'sparkle';
-      sparkle.style.setProperty('--tx', (Math.random() * 80 - 40) + 'px');
-      sparkle.style.setProperty('--ty', (Math.random() * 80 - 40) + 'px');
-      sparkle.style.width = (Math.random() * 4 + 2) + 'px';
+      sparkle.style.setProperty('--tx', Math.random() * 80 - 40 + 'px');
+      sparkle.style.setProperty('--ty', Math.random() * 80 - 40 + 'px');
+      sparkle.style.width = Math.random() * 4 + 2 + 'px';
       sparkle.style.height = sparkle.style.width;
-      sparkle.style.animationDelay = (Math.random() * 1.5) + 's';
+      sparkle.style.animationDelay = Math.random() * 1.5 + 's';
       container.appendChild(sparkle);
     }
 
-    container.appendChild(ring); container.appendChild(star);
+    container.appendChild(ring);
+    container.appendChild(star);
     const text = document.createElement('div');
-    text.className = 'spinner-text'; text.innerText = 'Geminiが思考中です...';
-    overlay.appendChild(container); overlay.appendChild(text);
+    text.className = 'spinner-text';
+    text.innerText = 'Geminiが思考中です...';
+    overlay.appendChild(container);
+    overlay.appendChild(text);
     document.body.appendChild(overlay);
   }
 
@@ -279,5 +410,4 @@
       setTimeout(() => overlay.remove(), 500);
     }
   }
-
 })(kintone.$PLUGIN_ID);

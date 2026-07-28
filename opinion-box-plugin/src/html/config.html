@@ -1,30 +1,152 @@
 <section class="settings">
-  <h2 class="settings-heading">Opinion Box プラグイン設定</h2>
-  <p class="kintoneplugin-desc">Geminiを利用するための通信設定情報（APIキー、モデル名）を入力してください。</p>
-  <form class="js-submit-settings">
+  <h2 class="settings-heading">Gemini連携プラグイン設定</h2>
 
+  <div id="obp-message" class="obp-banner" style="display:none"></div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">Gemini APIキー<span class="kintoneplugin-require">*</span></div>
+    <div class="kintoneplugin-desc">
+      Google AI Studio等で取得したAPIキーを入力してください。<br>
+      <span style="color:red; font-size:12px;">※ セキュリティ仕様上、保存済みのAPIキーは読み出せません。設定を保存するたびにAPIキーの再入力が必要です。</span>
+    </div>
+    <div class="kintoneplugin-input-outer">
+      <input type="password" id="obp-api-key" class="kintoneplugin-input-text" placeholder="APIキーを入力">
+      <button type="button" id="obp-api-key-toggle">表示</button>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">Geminiモデル<span class="kintoneplugin-require">*</span></div>
+    <div class="kintoneplugin-desc">
+      APIキーを入力すると、利用可能なモデルの一覧を自動取得します。モデルを選択すると自動で実疎通確認（実際にAPIを呼び出して利用可否を確認）します。
+    </div>
+    <div class="kintoneplugin-input-outer">
+      <select id="obp-model-select" class="kintoneplugin-select"></select>
+      <button type="button" id="obp-model-refresh">モデル一覧を再取得</button>
+      <span id="obp-model-status" class="obp-status-loading">未確認</span>
+    </div>
+    <div class="kintoneplugin-input-outer">
+      <label>
+        <input type="checkbox" id="obp-model-manual-check">
+        一覧にないモデル名を手入力する
+      </label>
+      <input type="text" id="obp-model-manual" disabled style="display:none" placeholder="例: gemini-2.5-flash">
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">アプリ別プリセット</div>
+    <div class="kintoneplugin-desc">
+      対象アプリに応じて、フィールドコードやプロンプトの初期値を一括で流し込みます。
+    </div>
+    <div class="kintoneplugin-input-outer">
+      <button type="button" id="obp-preset-opinion">意見書アプリ用の初期値を入れる</button>
+      <button type="button" id="obp-preset-contact">お問い合わせアプリ用の初期値を入れる</button>
+    </div>
+    <div class="kintoneplugin-desc">
+      ※ お問い合わせアプリ用プリセットのフィールドコードは参考値です。実際のアプリのフィールドコードに合わせて調整してください。
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">AIへの指示・メモ フィールド<span class="kintoneplugin-require">*</span></div>
+    <div class="kintoneplugin-desc">住民・利用者が入力する、AIへの指示やメモを保持するフィールドです。</div>
+    <div class="kintoneplugin-input-outer">
+      <select id="obp-field-input" class="kintoneplugin-select"></select>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">文章の長さ フィールド</div>
+    <div class="kintoneplugin-desc">文章の長さ（簡潔/標準/詳細）を選択させるフィールドです。使用しない場合は「（使用しない）」を選択してください。</div>
+    <div class="kintoneplugin-input-outer">
+      <select id="obp-field-length" class="kintoneplugin-select"></select>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">件名 出力先フィールド</div>
+    <div class="kintoneplugin-desc">AIが生成した件名の出力先フィールドです。使用しない場合は「（使用しない）」を選択してください。</div>
+    <div class="kintoneplugin-input-outer">
+      <select id="obp-field-subject" class="kintoneplugin-select"></select>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">本文 出力先フィールド<span class="kintoneplugin-require">*</span></div>
+    <div class="kintoneplugin-desc">AIが生成した本文の出力先フィールドです。</div>
+    <div class="kintoneplugin-input-outer">
+      <select id="obp-field-body" class="kintoneplugin-select"></select>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">下書きボタン設置スペース<span class="kintoneplugin-require">*</span></div>
+    <div class="kintoneplugin-desc">下書き生成ボタンを設置するスペースフィールドのIDです。</div>
+    <div class="kintoneplugin-input-outer">
+      <select id="obp-space-draft" class="kintoneplugin-select"></select>
+      <input type="text" id="obp-space-draft-text" style="display:none" placeholder="スペースIDを入力">
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <label>
+      <input type="checkbox" id="obp-summary-enabled" checked>
+      要約機能を利用する
+    </label>
+  </div>
+
+  <div id="obp-summary-section">
     <div class="kintoneplugin-row">
-      <div class="kintoneplugin-label">Gemini APIキー<span class="kintoneplugin-require">*</span></div>
-      <div class="kintoneplugin-desc">
-        Google AI Studio等で取得したAPIキーを入力してください。<br>
-        <span style="color:red; font-size:12px;">※ セキュリティのため、保存済みのキーは表示されません。変更時・初回設定時に必ず入力してください。</span>
-      </div>
+      <div class="kintoneplugin-label">要約 出力先フィールド<span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">AIが生成した要約の出力先フィールドです。</div>
       <div class="kintoneplugin-input-outer">
-        <input type="password" class="js-text-apikey kintoneplugin-input-text" required placeholder="APIキーを入力">
+        <select id="obp-field-summary" class="kintoneplugin-select"></select>
       </div>
     </div>
 
     <div class="kintoneplugin-row">
-      <div class="kintoneplugin-label">Gemini モデル名<span class="kintoneplugin-require">*</span></div>
-      <div class="kintoneplugin-desc">利用するAIのモデル名を入力してください。（デフォルト: gemini-2.5-flash）</div>
+      <div class="kintoneplugin-label">要約ボタン設置スペース<span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">要約ボタンを設置するスペースフィールドのIDです。</div>
       <div class="kintoneplugin-input-outer">
-        <input type="text" class="js-text-model kintoneplugin-input-text" required value="gemini-2.5-flash">
+        <select id="obp-space-summary" class="kintoneplugin-select"></select>
+        <input type="text" id="obp-space-summary-text" style="display:none" placeholder="スペースIDを入力">
       </div>
     </div>
+  </div>
 
-    <div class="kintoneplugin-row">
-      <button type="button" class="js-cancel-button kintoneplugin-button-dialog-cancel">キャンセル</button>
-      <button type="submit" class="kintoneplugin-button-dialog-ok">保存</button>
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">下書きボタン文言</div>
+    <div class="kintoneplugin-input-outer">
+      <input type="text" id="obp-btn-label-draft" class="kintoneplugin-input-text">
     </div>
-  </form>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">要約ボタン文言</div>
+    <div class="kintoneplugin-input-outer">
+      <input type="text" id="obp-btn-label-summary" class="kintoneplugin-input-text">
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">下書き生成プロンプト</div>
+    <div class="kintoneplugin-desc">使用できる差し込み変数: {{input}}（AIへの指示・メモ）、{{lengthInstruction}}（文字数の指示）</div>
+    <div class="kintoneplugin-input-outer">
+      <textarea id="obp-prompt-draft" rows="12"></textarea>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">要約プロンプト</div>
+    <div class="kintoneplugin-desc">使用できる差し込み変数: {{body}}（要約対象の本文）</div>
+    <div class="kintoneplugin-input-outer">
+      <textarea id="obp-prompt-summary" rows="10"></textarea>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <button type="button" id="obp-cancel" class="kintoneplugin-button-dialog-cancel">キャンセル</button>
+    <button type="button" id="obp-save" class="kintoneplugin-button-dialog-ok">保存</button>
+  </div>
 </section>
