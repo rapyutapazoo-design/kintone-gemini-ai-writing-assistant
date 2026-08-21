@@ -35,16 +35,23 @@
   </div>
 
   <div class="kintoneplugin-row">
-    <div class="kintoneplugin-label">アプリ別プリセット</div>
+    <div class="kintoneplugin-label">共通のフィールド構造</div>
     <div class="kintoneplugin-desc">
-      対象アプリに応じて、フィールドコードやプロンプトの初期値を一括で流し込みます。
+      意見書アプリ・お問い合わせアプリは同一のフィールド構成のため、フィールドコード・スペースIDの初期値は共通です。
     </div>
     <div class="kintoneplugin-input-outer">
-      <button type="button" id="obp-preset-opinion">意見書アプリ用の初期値を入れる</button>
-      <button type="button" id="obp-preset-contact">お問い合わせアプリ用の初期値を入れる</button>
+      <button type="button" id="obp-preset-structure">共通のフィールド構造の初期値を入れる</button>
     </div>
+  </div>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">文面プリセット</div>
     <div class="kintoneplugin-desc">
-      ※ お問い合わせアプリ用プリセットのフィールドコードは参考値です。実際のアプリのフィールドコードに合わせて調整してください。
+      ボタン文言・プロンプトの文面のみ、アプリの用途に応じて選んで流し込みます。
+    </div>
+    <div class="kintoneplugin-input-outer">
+      <button type="button" id="obp-preset-wording-opinion">意見書アプリ向けの文面にする</button>
+      <button type="button" id="obp-preset-wording-contact">お問い合わせアプリ向けの文面にする</button>
     </div>
   </div>
 
@@ -74,7 +81,7 @@
 
   <div class="kintoneplugin-row">
     <div class="kintoneplugin-label">本文 出力先フィールド<span class="kintoneplugin-require">*</span></div>
-    <div class="kintoneplugin-desc">AIが生成した本文の出力先フィールドです。</div>
+    <div class="kintoneplugin-desc">AIが生成した本文の出力先フィールドです。リッチエディターにも対応しています。</div>
     <div class="kintoneplugin-input-outer">
       <select id="obp-field-body" class="kintoneplugin-select"></select>
     </div>

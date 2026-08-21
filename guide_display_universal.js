@@ -1,4 +1,4 @@
-(function() {
+(function () {
     "use strict";
 
     // ---------------------------------------------------------
@@ -24,7 +24,7 @@
         const plusIcon = isMobile ? ICONS.PLUS_MOBILE : ICONS.PLUS_PC;
         // モバイル版の保存ボタン位置は「右下」
         const savePosition = isMobile ? '右下の' : '左上の';
-        
+
         const contentHTML = `
             <div style="font-size: 13px; color: #333; line-height: 1.8;">
                 <div style="margin-bottom: 10px;">
@@ -36,7 +36,7 @@
                     ご自身で手入力するか、AIに下書きさせることも可能です。<br>
                     <div style="margin-top: 6px; padding: 8px; background-color: #eef4fc; border-left: 4px solid #2062bf; border-radius: 2px;">
                         <strong style="color: #2062bf;">💡 AIを使う場合の手順</strong><br>
-                        1. 先に<strong>「AIへの指示・メモ」</strong>を入力する<br>
+                        1. 先に<strong>「AIへのプロンプト」</strong>に入力する<br>
                         2. その後、${ICONS.GEMINI_BTN} ボタンを押す
                     </div>
                 </div>
@@ -53,7 +53,7 @@
         `;
 
         const containerStyle = "background-color: #fff; border-radius: 8px; border: 1px solid #e3e7e8; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;";
-        
+
         // --- 一覧画面用（常時表示） ---
         if (!isAccordion) {
             const margin = isMobile ? "margin: 10px;" : "margin: 16px 16px 0 16px; padding: 15px 20px;";
@@ -67,7 +67,7 @@
                     ${contentHTML}
                 </div>
             `;
-        } 
+        }
         // --- フォーム画面用（開閉式・モバイル入力画面） ---
         else {
             const toggleId = 'guide-toggle-' + Date.now() + Math.floor(Math.random() * 1000);
@@ -90,7 +90,7 @@
     // ---------------------------------------------------------
     // 3. PC版のイベント処理
     // ---------------------------------------------------------
-    kintone.events.on(['app.record.index.show', 'app.record.create.show', 'app.record.edit.show', 'app.record.detail.show'], function(event) {
+    kintone.events.on(['app.record.index.show', 'app.record.create.show', 'app.record.edit.show', 'app.record.detail.show'], function (event) {
         if (document.getElementById('my-guide-pc-container')) return;
 
         let targetEl = null;
@@ -103,12 +103,12 @@
         if (targetEl) {
             const div = document.createElement('div');
             div.id = 'my-guide-pc-container';
-            if(event.type !== 'app.record.index.show') {
-                 div.innerHTML = createGuideHTML(false, false);
-                 targetEl.insertBefore(div, targetEl.firstChild);
+            if (event.type !== 'app.record.index.show') {
+                div.innerHTML = createGuideHTML(false, false);
+                targetEl.insertBefore(div, targetEl.firstChild);
             } else {
-                 targetEl.innerHTML = createGuideHTML(false, false);
-                 if(targetEl.firstElementChild) targetEl.firstElementChild.style.margin = "0 0 20px 0";
+                targetEl.innerHTML = createGuideHTML(false, false);
+                if (targetEl.firstElementChild) targetEl.firstElementChild.style.margin = "0 0 20px 0";
             }
         }
     });
@@ -116,9 +116,9 @@
     // ---------------------------------------------------------
     // 4. スマホ版のイベント処理
     // ---------------------------------------------------------
-    
+
     // ■ A. 一覧画面 (index): ヘッダーに「常時表示」
-    kintone.events.on('mobile.app.record.index.show', function(event) {
+    kintone.events.on('mobile.app.record.index.show', function (event) {
         if (document.getElementById('my-mobile-guide-index')) return;
 
         const headerSpace = kintone.mobile.app.getHeaderSpaceElement();
@@ -133,7 +133,7 @@
     // ■ B. 詳細・作成・編集画面: フォームの上に「開閉式表示」
     const MOBILE_FORM_EVENTS = ['mobile.app.record.create.show', 'mobile.app.record.edit.show', 'mobile.app.record.detail.show'];
 
-    kintone.events.on(MOBILE_FORM_EVENTS, function(event) {
+    kintone.events.on(MOBILE_FORM_EVENTS, function (event) {
         // 既に表示済みなら終了
         if (document.getElementById('my-mobile-guide-form')) return;
 
@@ -146,7 +146,7 @@
         const toggleBtn = wrapper.querySelector('[id^="guide-toggle-"]');
         const contentDiv = wrapper.querySelector('[id^="guide-content-"]');
         if (toggleBtn && contentDiv) {
-            toggleBtn.onclick = function() {
+            toggleBtn.onclick = function () {
                 const isClosed = contentDiv.style.display === 'none';
                 contentDiv.style.display = isClosed ? 'block' : 'none';
                 this.querySelector('span:last-child').innerText = isClosed ? '▲' : '▼';
@@ -156,7 +156,7 @@
         // モバイル版のメインコンテンツエリアへの挿入（MutationObserverを使用）
         const targetSelector = '.gaia-mobile-v2-view-panel-content';
         const mobileContent = document.querySelector(targetSelector);
-        
+
         if (mobileContent) {
             if (!document.getElementById('my-mobile-guide-form')) {
                 mobileContent.insertBefore(wrapper, mobileContent.firstChild);
@@ -172,7 +172,7 @@
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
-            
+
             // 10秒後にフォールバックとしてObserverを停止する（無限監視防止）
             setTimeout(() => observer.disconnect(), 10000);
         }

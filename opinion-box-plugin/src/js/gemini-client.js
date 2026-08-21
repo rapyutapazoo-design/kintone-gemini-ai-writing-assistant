@@ -14,6 +14,7 @@
   ];
   const LIST_TIMEOUT_MS = 15000;
   const TEST_TIMEOUT_MS = 15000;
+  const PROXY_TIMEOUT_MS = 20000;
   const MAX_LIST_PAGES = 5;
 
   function stripModelPrefix(name) {
@@ -200,6 +201,15 @@
 
   function proxyRequest(pluginId, url, method, headers, data) {
     return new Promise((resolve, reject) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        // kintone.plugin.app.proxy()には呼び出し側から中断する手段がないため、
+        // 応答を待つのをここで諦めて warn 扱い（status:0）として先に進む。
+        resolve({ status: 0, body: null });
+      }, PROXY_TIMEOUT_MS);
+
       kintone.plugin.app.proxy(
         pluginId,
         url,
@@ -207,9 +217,15 @@
         headers,
         data,
         (body, status) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
           resolve({ status: status, body: body });
         },
         (err) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
           reject(
             new Error('kintone proxy でエラーが発生しました。詳細: ' + err),
           );
@@ -285,6 +301,70 @@
     return { subject: '', body: text };
   }
 
+  function escapeHtml(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function richTextToPlainText(html) {
+    if (html == null || typeof html !== 'string') {
+      return '';
+    }
+
+    let text = html
+      .replace(/<\/(div|p|li|tr)>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&');
+
+    text = text
+      .replace(/\n{3,}/g, '\n\n')
+      .split('\n')
+      .map((line) => line.replace(/[ \t]+$/g, ''))
+      .join('\n')
+      .trim();
+
+    return text;
+  }
+
+  function plainTextToRichText(text) {
+    const normalized = String(text == null ? '' : text).replace(
+      /\r\n|\r/g,
+      '\n',
+    );
+    const escaped = escapeHtml(normalized);
+
+    return escaped
+      .split('\n')
+      .map((line) => {
+        if (line.trim().length === 0) {
+          return '<div><br /></div>';
+        }
+        const withIndent = line.replace(/^ +/, (spaces) =>
+          '&nbsp;'.repeat(spaces.length),
+        );
+        return '<div>' + withIndent + '</div>';
+      })
+      .join('');
+  }
+
+  function isFieldValueEmpty(value, type) {
+    const text =
+      type === 'RICH_TEXT'
+        ? richTextToPlainText(value)
+        : String(value == null ? '' : value);
+    return text.replace(/[\s\u3000]+/g, '').length === 0;
+  }
+
   global.GeminiPluginClient = {
     API_BASE: API_BASE,
     PROXY_POST_PREFIX: PROXY_POST_PREFIX,
@@ -293,6 +373,7 @@
     FALLBACK_MODELS: FALLBACK_MODELS,
     LIST_TIMEOUT_MS: LIST_TIMEOUT_MS,
     TEST_TIMEOUT_MS: TEST_TIMEOUT_MS,
+    PROXY_TIMEOUT_MS: PROXY_TIMEOUT_MS,
     MAX_LIST_PAGES: MAX_LIST_PAGES,
     normalizeModelName: normalizeModelName,
     stripModelPrefix: stripModelPrefix,
@@ -305,5 +386,9 @@
     testModelViaProxy: testModelViaProxy,
     extractText: extractText,
     tryParseJsonPayload: tryParseJsonPayload,
+    escapeHtml: escapeHtml,
+    richTextToPlainText: richTextToPlainText,
+    plainTextToRichText: plainTextToRichText,
+    isFieldValueEmpty: isFieldValueEmpty,
   };
 })(window);

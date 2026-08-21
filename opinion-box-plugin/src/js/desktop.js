@@ -13,6 +13,7 @@
 1. 文字数目安: {{lengthInstruction}}
 2. 挨拶文、署名は一切禁止。
 3. 「です・ます」調。
+4. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用しないこと。HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行はそのまま改行文字で表現すること。
 【メモ】
 {{input}}`;
 
@@ -24,6 +25,7 @@
 2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。
 3. 冗長な表現は避け、事実関係を明確にしてください。
 4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。
+5. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用せず、HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。改行はそのまま改行文字で表現すること。
 
 【本文】
 {{body}}`;
@@ -60,6 +62,9 @@
           code +
           '」がこのアプリに存在しません。プラグイン設定を確認してください。',
       );
+    }
+    if (record[code].type === 'RICH_TEXT') {
+      return client.richTextToPlainText(record[code].value);
     }
     return record[code].value || '';
   }
@@ -250,7 +255,11 @@
 
       const currentRecord = appManager.record.get();
       readFieldValue(currentRecord.record, F_BODY);
-      currentRecord.record[F_BODY].value = data.body;
+      const bodyText = data.body || '';
+      currentRecord.record[F_BODY].value =
+        currentRecord.record[F_BODY].type === 'RICH_TEXT'
+          ? client.plainTextToRichText(bodyText)
+          : bodyText;
       if (F_SUBJECT && currentRecord.record[F_SUBJECT]) {
         currentRecord.record[F_SUBJECT].value = data.subject;
       }
@@ -283,7 +292,7 @@
     const recordId = record.$id.value;
     const appId = (isMobile ? kintone.mobile.app : kintone.app).getId();
 
-    if (!opinion) {
+    if (client.isFieldValueEmpty(opinion, 'MULTI_LINE_TEXT')) {
       alert('「意見内容」が空のため要約できません。');
       return;
     }
@@ -295,7 +304,12 @@
     try {
       const resultText = await callGeminiAPI(prompt, false);
       const body = { app: appId, id: recordId, record: {} };
-      body.record[F_SUMMARY] = { value: resultText };
+      body.record[F_SUMMARY] = {
+        value:
+          record[F_SUMMARY] && record[F_SUMMARY].type === 'RICH_TEXT'
+            ? client.plainTextToRichText(resultText)
+            : resultText,
+      };
       await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body);
       alert('要約が完了しました。ページを更新します。');
       location.reload();

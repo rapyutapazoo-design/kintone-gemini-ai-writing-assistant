@@ -11,6 +11,7 @@
 1. 文字数目安: {{lengthInstruction}}
 2. 挨拶文、署名は一切禁止。
 3. 「です・ます」調。
+4. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用しないこと。HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行はそのまま改行文字で表現すること。
 【メモ】
 {{input}}`;
 
@@ -22,12 +23,14 @@
 2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。
 3. 冗長な表現は避け、事実関係を明確にしてください。
 4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。
+5. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用せず、HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。改行はそのまま改行文字で表現すること。
 
 【本文】
 {{body}}`;
 
   const CONTACT_PROMPT_DRAFT = `あなたは、マンション管理組合の「デジタル委員会」が運営するお問い合わせ窓口の下書き作成アシスタントです。
 以下の「利用者からの指示・メモ」をもとに、デジタル委員会宛てのお問い合わせ内容として、丁寧語（です・ます調）で件名と本文の下書きを作成してください。
+Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用しないこと。HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行はそのまま改行文字で表現すること。
 
 【出力形式】
 必ず次の形式のJSONのみを出力してください。前後に説明文やコードフェンス（\`\`\`など）は一切付けないでください。
@@ -35,6 +38,19 @@
 
 【利用者からの指示・メモ】
 {{input}}`;
+
+  const CONTACT_PROMPT_SUMMARY = `あなたはマンション管理組合の理事会資料作成担当です。
+以下のお問い合わせ内容を、理事会資料として適切な長さに要約してください。
+
+【要約のルール】
+1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。
+2. 短い内容は一言で簡潔に、複雑な背景がある内容は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。
+3. 冗長な表現は避け、事実関係を明確にしてください。
+4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。
+5. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用せず、HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。改行はそのまま改行文字で表現すること。
+
+【本文】
+{{body}}`;
 
   const DEFAULTS = {
     gemini_model: 'gemini-2.5-flash',
@@ -52,7 +68,7 @@
     prompt_summary: DEFAULT_PROMPT_SUMMARY,
   };
 
-  const PRESET_OPINION = {
+  const STRUCTURE_PRESET_COMMON = {
     field_input: 'keyword_input',
     field_length: 'length_option',
     field_subject: 'opinion_subject',
@@ -61,25 +77,20 @@
     space_draft: 'btn_space_draft',
     space_summary: 'btn_space_summary',
     summary_enabled: 'yes',
+  };
+
+  const WORDING_PRESET_OPINION = {
     btn_label_draft: 'Geminiで件名・本文を作成',
     btn_label_summary: 'Geminiで要約',
     prompt_draft: DEFAULT_PROMPT_DRAFT,
     prompt_summary: DEFAULT_PROMPT_SUMMARY,
   };
 
-  const PRESET_CONTACT = {
-    field_input: 'field_instruction',
-    field_length: '',
-    field_subject: 'subject',
-    field_body: 'body',
-    field_summary: '',
-    space_draft: 'btn_space_draft',
-    space_summary: '',
-    summary_enabled: 'no',
+  const WORDING_PRESET_CONTACT = {
     btn_label_draft: 'Geminiで下書きを作成',
-    btn_label_summary: '',
+    btn_label_summary: 'Geminiで要約',
     prompt_draft: CONTACT_PROMPT_DRAFT,
-    prompt_summary: '',
+    prompt_summary: CONTACT_PROMPT_SUMMARY,
   };
 
   const config = kintone.plugin.app.getConfig(PLUGIN_ID) || {};
@@ -189,8 +200,8 @@
 
   async function loadFields() {
     const typeMap = {
-      'obp-field-input': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT'],
-      'obp-field-body': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT'],
+      'obp-field-input': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT', 'RICH_TEXT'],
+      'obp-field-body': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT', 'RICH_TEXT'],
       'obp-field-summary': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT'],
       'obp-field-subject': ['SINGLE_LINE_TEXT'],
       'obp-field-length': ['DROP_DOWN', 'RADIO_BUTTON', 'SINGLE_LINE_TEXT'],
@@ -469,6 +480,11 @@
     const apiKey = document.getElementById('obp-api-key').value;
     const modelName = getSelectedModelName();
 
+    showMessage(
+      'info',
+      '保存処理を実行しています…（kintoneプロキシ経由の確認を含むため、最大20秒程度かかる場合があります）',
+    );
+
     try {
       await saveProxyConfig(apiKey);
     } catch (e) {
@@ -583,11 +599,24 @@
       }
     }
 
-    await doSave();
+    const saveBtn = document.getElementById('obp-save');
+    const originalLabel = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中…';
+    try {
+      await doSave();
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalLabel;
+    }
   }
 
-  function applyPreset(preset) {
-    if (!confirm('現在の入力内容を上書きします。よろしいですか？')) {
+  function applyStructurePreset(preset) {
+    if (
+      !confirm(
+        '現在のフィールド・スペースの設定を上書きします。よろしいですか？',
+      )
+    ) {
       return;
     }
 
@@ -612,6 +641,14 @@
     document.getElementById('obp-summary-section').style.display = summaryOn
       ? ''
       : 'none';
+  }
+
+  function applyWordingPreset(preset) {
+    if (
+      !confirm('現在のボタン文言・プロンプトを上書きします。よろしいですか？')
+    ) {
+      return;
+    }
 
     document.getElementById('obp-btn-label-draft').value =
       preset.btn_label_draft;
@@ -634,8 +671,13 @@
     const modelManualCheck = document.getElementById('obp-model-manual-check');
     const summaryEnabledEl = document.getElementById('obp-summary-enabled');
     const summarySection = document.getElementById('obp-summary-section');
-    const presetOpinion = document.getElementById('obp-preset-opinion');
-    const presetContact = document.getElementById('obp-preset-contact');
+    const presetStructure = document.getElementById('obp-preset-structure');
+    const presetWordingOpinion = document.getElementById(
+      'obp-preset-wording-opinion',
+    );
+    const presetWordingContact = document.getElementById(
+      'obp-preset-wording-contact',
+    );
     const saveBtn = document.getElementById('obp-save');
     const cancelBtn = document.getElementById('obp-cancel');
 
@@ -673,8 +715,15 @@
       summarySection.style.display = summaryEnabledEl.checked ? '' : 'none';
     });
 
-    presetOpinion.addEventListener('click', () => applyPreset(PRESET_OPINION));
-    presetContact.addEventListener('click', () => applyPreset(PRESET_CONTACT));
+    presetStructure.addEventListener('click', () =>
+      applyStructurePreset(STRUCTURE_PRESET_COMMON),
+    );
+    presetWordingOpinion.addEventListener('click', () =>
+      applyWordingPreset(WORDING_PRESET_OPINION),
+    );
+    presetWordingContact.addEventListener('click', () =>
+      applyWordingPreset(WORDING_PRESET_CONTACT),
+    );
 
     saveBtn.addEventListener('click', () => {
       onSaveClick();
