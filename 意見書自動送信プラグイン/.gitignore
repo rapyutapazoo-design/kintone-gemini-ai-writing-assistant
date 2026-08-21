@@ -1,0 +1,10 @@
+# Kintone Plugin Packaging
+dist/
+node_modules/
+
+# Secrets
+private.ppk
+
+# GAS local credentials (clasp)
+gas/.clasp.json
+gas/.clasprc.json

@@ -1,0 +1,57 @@
+.settings {
+  padding: 20px;
+  max-width: 760px;
+}
+
+.settings-heading {
+  margin-bottom: 8px;
+}
+
+.settings-section {
+  margin: 28px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e3e7e8;
+  font-size: 16px;
+  color: #3498db;
+}
+
+.kintoneplugin-row {
+  margin-bottom: 18px;
+}
+
+.kintoneplugin-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.kintoneplugin-require {
+  color: #e50000;
+  margin-left: 5px;
+}
+
+.kintoneplugin-input-text.wide,
+textarea.kintoneplugin-input-text.wide {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+textarea.kintoneplugin-input-text {
+  font-family: inherit;
+  resize: vertical;
+}
+
+.warn {
+  color: #c0392b;
+  font-size: 12px;
+}
+
+code {
+  background: #f2f4f5;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.btn-row {
+  margin-top: 28px;
+}
