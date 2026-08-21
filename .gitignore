@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+
+# Kintone plugin packaging
+dist/
+
+# Secrets
+private.ppk
+.env
+*.pem
