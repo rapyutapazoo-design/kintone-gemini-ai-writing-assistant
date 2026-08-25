@@ -5,6 +5,7 @@
   const config = kintone.plugin.app.getConfig(PLUGIN_ID) || {};
   const client = window.GeminiPluginClient;
   const genOpts = window.GeminiGenerationOptions;
+  const backup = window.GeminiPromptBackup;
 
   const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
 以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
@@ -68,6 +69,27 @@
 
   // 出力先の上書き保護（既定 'yes' = 確認する）
   const OVERWRITE_CONFIRM = (config.overwrite_confirm || 'yes') !== 'no';
+
+  // =========================================================
+  // プロンプトの自動退避・復元設定
+  // 既定は 'no'（未設定の既存アプリの挙動を一切変えないため最重要）。
+  // =========================================================
+  const CLEAR_INPUT_AFTER_DRAFT =
+    (config.clear_input_after_draft || 'no') === 'yes';
+  const F_INPUT_BACKUP = config.field_input_backup || '';
+  const BACKUP_MAX_CHARS = (function () {
+    const raw = config.backup_max_chars;
+    if (raw === undefined || raw === null || String(raw).trim() === '') {
+      return 100000;
+    }
+    const n = parseInt(raw, 10);
+    if (isNaN(n) || n < 0) {
+      return 100000;
+    }
+    return n;
+  })();
+  const SPACE_RESTORE = config.space_restore || '';
+  const LABEL_RESTORE = config.btn_label_restore || 'プロンプトを復元';
 
   function renderTemplate(tpl, vars) {
     return String(tpl).replace(/\{\{(\w+)\}\}/g, (m, key) =>
@@ -189,28 +211,40 @@
   ];
 
   kintone.events.on(EVENTS_EDIT, function (event) {
+    // kintone の SPA 遷移では前画面の cleanup() が呼ばれないことがあるため、
+    // 復元モーダルのオーバーレイが残っていればここで除去する（軽微5）。
+    removeOrphanedRestoreModal();
+
     const isMobile = event.type.startsWith('mobile.');
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
     const space = appManager.record.getSpaceElement(SPACE_DRAFT);
-    if (!space) return;
-    space.innerHTML = '';
 
-    const btn = document.createElement('button');
-    btn.innerHTML = GEMINI_LOGO_SVG + LABEL_DRAFT;
-    btn.style = BTN_STYLE;
-    if (isMobile) {
-      btn.style.width = '100%';
-      btn.style.marginBottom = '10px';
+    if (space) {
+      space.innerHTML = '';
+
+      const btn = document.createElement('button');
+      btn.innerHTML = GEMINI_LOGO_SVG + LABEL_DRAFT;
+      btn.style = BTN_STYLE;
+      if (isMobile) {
+        btn.style.width = '100%';
+        btn.style.marginBottom = '10px';
+      }
+
+      btn.onclick = function (e) {
+        e.preventDefault();
+        generateDraft(isMobile);
+      };
+      space.appendChild(btn);
     }
 
-    btn.onclick = function (e) {
-      e.preventDefault();
-      generateDraft(isMobile);
-    };
-    space.appendChild(btn);
+    renderRestoreButton(event.record, isMobile, appManager);
   });
 
   kintone.events.on(EVENTS_DETAIL, function (event) {
+    // kintone の SPA 遷移では前画面の cleanup() が呼ばれないことがあるため、
+    // 復元モーダルのオーバーレイが残っていればここで除去する（軽微5）。
+    removeOrphanedRestoreModal();
+
     if (!SUMMARY_ON) return;
     const isMobile = event.type.startsWith('mobile.');
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
@@ -286,6 +320,97 @@
     );
   }
 
+  // 実際に適用されたフォーマット指示文から、退避ログのメタ情報に使う
+  // フォーマット名（generation-options の label）を逆引きする。
+  // 一致するものがなければ「カスタム」とみなす。
+  function resolveFormatLabel(formatInstruction) {
+    const matched = genOpts.FORMAT_OPTIONS.filter(function (f) {
+      return f.id !== 'custom' && f.instruction === formatInstruction;
+    })[0];
+    if (matched) {
+      return matched.label;
+    }
+    const custom = genOpts.getFormatOption('custom');
+    return custom ? custom.label : 'カスタム';
+  }
+
+  // 退避先フィールドへ新しい世代を追記し、上限を適用して書き戻す。
+  // inputField・backupField は同一の record.set() で書き込まれる
+  // currentRecord.record の一部（呼び出し元で存在確認済み）。
+  function appendToBackupField(
+    inputField,
+    backupField,
+    keyword,
+    lengthOption,
+    sourceRecord,
+  ) {
+    const lengthLabelForBackup = lengthOption || '指定なし';
+    const formatLabelForBackup = resolveFormatLabel(
+      resolveFormatInstruction(sourceRecord),
+    );
+    // 退避先が RICH_TEXT の場合、既存ログの読み出しも書き戻しも型に応じて
+    // 変換する（軽微3: 読み書きの非対称を解消。既存ログを生HTMLのまま
+    // appendEntry に渡すと区切り行がタグに包まれて検出できなくなるため）。
+    const existingBackupText =
+      backupField.type === 'RICH_TEXT'
+        ? client.richTextToPlainText(backupField.value)
+        : String(backupField.value || '');
+    const appended = backup.appendEntry(existingBackupText, keyword, {
+      lengthLabel: lengthLabelForBackup,
+      formatLabel: formatLabelForBackup,
+    });
+    const trimmed = backup.trimToMaxChars(appended, BACKUP_MAX_CHARS);
+    backupField.value =
+      backupField.type === 'RICH_TEXT'
+        ? client.plainTextToRichText(trimmed)
+        : trimmed;
+    // RICH_TEXT も空文字でクリアする（モバイル実機でのHTML解釈は未検証）
+    inputField.value = '';
+  }
+
+  // 入力欄クリア＆退避への追記は、本文・件名の書き込みと同じ record.set()
+  // 呼び出しにまとめて含めることで、失敗・タイムアウト・上書き確認キャンセル
+  // の経路からは絶対に到達しない構造にする（呼び出し元で currentRecord に
+  // 対して呼び、その後まとめて appManager.record.set(currentRecord) する）。
+  function applyClearAndBackupIfNeeded(
+    currentRecord,
+    recordData,
+    keyword,
+    lengthOption,
+  ) {
+    if (!CLEAR_INPUT_AFTER_DRAFT) {
+      return;
+    }
+    const inputField = currentRecord.record[F_INPUT];
+    if (!inputField) {
+      return;
+    }
+    if (!F_INPUT_BACKUP) {
+      // 退避先未設定 → 単純クリア（復元不可）
+      // RICH_TEXT も空文字でクリアする（モバイル実機でのHTML解釈は未検証）
+      inputField.value = '';
+      return;
+    }
+    const backupField = currentRecord.record[F_INPUT_BACKUP];
+    if (!backupField) {
+      // 退避先フィールドがこのレコード（アプリ）に存在しない場合は
+      // 復元不能になることを避けるため、退避もクリアも行わない。
+      console.warn(
+        'プロンプト退避先フィールド「' +
+          F_INPUT_BACKUP +
+          '」がこのアプリに存在しないため、退避と入力欄のクリアをスキップしました。',
+      );
+      return;
+    }
+    appendToBackupField(
+      inputField,
+      backupField,
+      keyword,
+      lengthOption,
+      recordData.record,
+    );
+  }
+
   async function generateDraft(isMobile) {
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
     const recordData = appManager.record.get();
@@ -333,7 +458,25 @@
       if (F_SUBJECT && currentRecord.record[F_SUBJECT]) {
         currentRecord.record[F_SUBJECT].value = data.subject;
       }
+
+      // 退避処理の失敗（想定外の例外）で、API課金済みの生成結果（本文・件名）
+      // ごと破棄されないよう、退避だけを個別の try/catch で分離する（重要5）。
+      // 失敗時は退避とクリアのみスキップし、record.set() は必ず実行する。
+      try {
+        applyClearAndBackupIfNeeded(
+          currentRecord,
+          recordData,
+          keyword,
+          lengthOption,
+        );
+      } catch (backupError) {
+        console.error(backupError);
+      }
+
       appManager.record.set(currentRecord);
+      // クリア直後もその場で復元できるよう、更新後のレコードで
+      // 復元ボタンを再描画する（重要2）。
+      renderRestoreButton(currentRecord.record, isMobile, appManager);
     } catch (error) {
       console.error(error);
       if (
@@ -451,7 +594,251 @@
   }
 
   // =========================================================
-  // 5. ローディング表示関数
+  // 5. プロンプト復元機能
+  // =========================================================
+
+  // 現在開いている復元モーダルの cleanup 関数。kintone の SPA 遷移では
+  // モーダルを開いたまま画面が切り替わっても cleanup() が呼ばれないことが
+  // あるため、次の画面表示時に removeOrphanedRestoreModal() 経由で
+  // 必ず同じ cleanup() を呼び出し、オーバーレイと Esc キーリスナーの
+  // 両方を確実に片付ける（軽微5）。
+  let activeRestoreModalCleanup = null;
+
+  // 前画面で開かれたまま残っている復元モーダルを除去する。
+  // 各 kintone.events.on ハンドラの冒頭から呼び出す。
+  function removeOrphanedRestoreModal() {
+    if (activeRestoreModalCleanup) {
+      const cleanupFn = activeRestoreModalCleanup;
+      activeRestoreModalCleanup = null;
+      cleanupFn();
+      return;
+    }
+    // cleanup 参照が失われていても、DOM 上にオーバーレイが残っていれば
+    // 念のため除去しておく（Escリスナーは cleanup 経由でのみ確実に外せるが、
+    // 参照が無い状態は通常発生しない防御的フォールバック）。
+    document
+      .querySelectorAll('.obp-restore-modal-overlay')
+      .forEach(function (el) {
+        if (el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      });
+  }
+
+  // 復元ボタンを描画してよいかを判定する。
+  // いずれか該当すれば描画しない:
+  //   ・復元ボタン設置スペースが未設定
+  //   ・退避先フィールドが未設定
+  //   ・退避先フィールドがこのレコード（アプリ）に存在しない
+  //     （＝アクセス権で読めない、またはフィールド削除済み）
+  //   ・退避先の値が空
+  function shouldShowRestoreButton(record) {
+    if (!SPACE_RESTORE || !F_INPUT_BACKUP) {
+      return false;
+    }
+    const field = record[F_INPUT_BACKUP];
+    if (!field || field.value == null) {
+      return false;
+    }
+    const text =
+      field.type === 'RICH_TEXT'
+        ? client.richTextToPlainText(field.value)
+        : String(field.value);
+    return text.trim().length > 0;
+  }
+
+  function renderRestoreButton(record, isMobile, appManager) {
+    // 復元ボタン設置スペースが下書き/要約ボタンの設置スペースと重複していると
+    // space.innerHTML='' で先に描画したボタンを破棄してしまうため、
+    // スペース要素へは一切触れずに描画をスキップする（重要1）。
+    if (
+      SPACE_RESTORE &&
+      (SPACE_RESTORE === SPACE_DRAFT || SPACE_RESTORE === SPACE_SUMMARY)
+    ) {
+      console.warn(
+        'プロンプト復元ボタン設置スペース「' +
+          SPACE_RESTORE +
+          '」が他のボタンの設置スペースと重複しているため、復元ボタンは表示されません。プラグイン設定でスペースIDを重複しないよう変更してください。',
+      );
+      return;
+    }
+
+    const space = appManager.record.getSpaceElement(SPACE_RESTORE);
+    if (!space) {
+      return;
+    }
+    // スペース要素を取得できた場合は、描画可否の判定結果に関わらず
+    // 先にクリアしておく。こうしないと退避内容が空になった際に
+    // 古い復元ボタンが残り続けてしまう（軽微6）。
+    space.innerHTML = '';
+
+    if (!shouldShowRestoreButton(record)) {
+      return;
+    }
+
+    const btn = document.createElement('button');
+    btn.textContent = LABEL_RESTORE;
+    btn.style = BTN_STYLE;
+    if (isMobile) {
+      btn.style.width = '100%';
+      btn.style.marginBottom = '10px';
+    }
+
+    btn.onclick = function (e) {
+      e.preventDefault();
+      handleRestoreClick(appManager);
+    };
+    space.appendChild(btn);
+  }
+
+  function handleRestoreClick(appManager) {
+    const recordData = appManager.record.get();
+    const backupField = recordData.record[F_INPUT_BACKUP];
+    if (!backupField) {
+      alert('退避先フィールドが見つかりません。');
+      return;
+    }
+    const backupText =
+      backupField.type === 'RICH_TEXT'
+        ? client.richTextToPlainText(backupField.value)
+        : String(backupField.value || '');
+    const entries = backup.parseBackupLog(backupText);
+    if (entries.length === 0) {
+      alert('復元できる履歴がありません。');
+      return;
+    }
+    // 区切りが1つも見つからず fallback で1件として返された場合は、
+    // ログが壊れている可能性があるため確認なしで即復元せず、
+    // モーダルでプレビューさせてから復元させる（軽微2）。
+    if (entries.length === 1 && !entries[0].isFallback) {
+      performRestore(entries[0], appManager);
+      return;
+    }
+    showRestoreModal(entries, function (chosenEntry) {
+      performRestore(chosenEntry, appManager);
+    });
+  }
+
+  // 復元は入力欄への書き戻しのみを行う。退避フィールドは一切変更しない。
+  function performRestore(entry, appManager) {
+    const recordData = appManager.record.get();
+    const inputField = recordData.record[F_INPUT];
+    if (!inputField) {
+      alert('「AIへの指示・メモ」フィールドが見つかりません。');
+      return;
+    }
+    const hasValue = !client.isFieldValueEmpty(
+      inputField.value,
+      inputField.type,
+    );
+    if (hasValue) {
+      const proceed = confirm(
+        '入力欄に既に内容があります。復元内容で上書きしますか？',
+      );
+      if (!proceed) {
+        return;
+      }
+    }
+    inputField.value =
+      inputField.type === 'RICH_TEXT'
+        ? client.plainTextToRichText(entry.body)
+        : entry.body;
+    appManager.record.set(recordData);
+  }
+
+  // 動的生成する簡易モーダル（外部ライブラリ不使用）。
+  // 閉じる手段はキャンセルボタン・背景クリック・Escキーの3経路すべてに対応し、
+  // Escキーのリスナーはモーダルを閉じる際に必ず解除する。
+  function showRestoreModal(entries, onSelect) {
+    const overlay = document.createElement('div');
+    overlay.className = 'obp-restore-modal-overlay';
+
+    const card = document.createElement('div');
+    card.className = 'obp-restore-modal-card';
+
+    const title = document.createElement('div');
+    title.className = 'obp-restore-modal-title';
+    title.textContent = '復元する世代を選択してください';
+    card.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'obp-restore-modal-list';
+
+    entries.forEach(function (entry) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'obp-restore-modal-item';
+
+      const meta = document.createElement('div');
+      meta.className = 'obp-restore-modal-item-meta';
+      meta.textContent =
+        '[' +
+        entry.index +
+        '] ' +
+        entry.datetime +
+        (entry.meta ? ' / ' + entry.meta : '');
+
+      const preview = document.createElement('div');
+      preview.className = 'obp-restore-modal-item-preview';
+      preview.textContent = entry.body.slice(0, 50);
+
+      item.appendChild(meta);
+      item.appendChild(preview);
+      item.addEventListener('click', function () {
+        cleanup();
+        onSelect(entry);
+      });
+      list.appendChild(item);
+    });
+
+    card.appendChild(list);
+
+    const actions = document.createElement('div');
+    actions.className = 'obp-restore-modal-actions';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'obp-restore-modal-cancel';
+    cancelBtn.textContent = 'キャンセル';
+    cancelBtn.addEventListener('click', function () {
+      cleanup();
+    });
+    actions.appendChild(cancelBtn);
+    card.appendChild(actions);
+
+    overlay.appendChild(card);
+
+    function onKeydown(e) {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        cleanup();
+      }
+    }
+
+    function onOverlayClick(e) {
+      if (e.target === overlay) {
+        cleanup();
+      }
+    }
+
+    function cleanup() {
+      document.removeEventListener('keydown', onKeydown);
+      overlay.removeEventListener('click', onOverlayClick);
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+      if (activeRestoreModalCleanup === cleanup) {
+        activeRestoreModalCleanup = null;
+      }
+    }
+
+    overlay.addEventListener('click', onOverlayClick);
+    document.addEventListener('keydown', onKeydown);
+
+    document.body.appendChild(overlay);
+    activeRestoreModalCleanup = cleanup;
+  }
+
+  // =========================================================
+  // 6. ローディング表示関数
   // =========================================================
   function showSpinner() {
     if (document.getElementById('kintone-spinner-overlay')) return;

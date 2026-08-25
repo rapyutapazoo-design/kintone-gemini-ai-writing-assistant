@@ -35,6 +35,11 @@
     format_default: DEFAULT_FORMAT_INSTRUCTION,
     overwrite_confirm: 'yes',
     preset_id: '',
+    clear_input_after_draft: 'no',
+    field_input_backup: '',
+    backup_max_chars: '100000',
+    space_restore: '',
+    btn_label_restore: 'プロンプトを復元',
   };
 
   const STRUCTURE_PRESET_COMMON = {
@@ -174,6 +179,7 @@
       meta[code] = {
         type: f.type,
         options: options.map((o) => o.label),
+        required: !!f.required,
       };
     });
     fieldMetaCache = meta;
@@ -187,6 +193,10 @@
       'obp-field-subject': ['SINGLE_LINE_TEXT'],
       'obp-field-length': ['DROP_DOWN', 'RADIO_BUTTON', 'SINGLE_LINE_TEXT'],
       'obp-field-format': ['DROP_DOWN', 'RADIO_BUTTON', 'SINGLE_LINE_TEXT'],
+      // 全世代を追記する退避ログのため、文字列（複数行）のみに限定する。
+      // 1行では全世代が読めず、リッチエディターはHTMLタグ混入で
+      // 区切り行（===== [n] ...）の構造が壊れるため対象外とする。
+      'obp-field-input-backup': ['MULTI_LINE_TEXT'],
     };
     const allowEmptyMap = {
       'obp-field-input': false,
@@ -195,6 +205,7 @@
       'obp-field-subject': true,
       'obp-field-length': true,
       'obp-field-format': true,
+      'obp-field-input-backup': true,
     };
     const savedMap = {
       'obp-field-input':
@@ -221,6 +232,10 @@
         config.field_format !== undefined
           ? config.field_format
           : DEFAULTS.field_format,
+      'obp-field-input-backup':
+        config.field_input_backup !== undefined
+          ? config.field_input_backup
+          : DEFAULTS.field_input_backup,
     };
 
     try {
@@ -258,6 +273,7 @@
     }
 
     renderLengthMapTable();
+    updateBackupCheck();
   }
 
   async function reloadFieldMeta() {
@@ -269,6 +285,7 @@
       );
       buildFieldMetaCache(res.properties);
       renderLengthMapTable();
+      updateBackupCheck();
       showMessage('info', 'フィールドの選択肢を再読込しました。');
     } catch (e) {
       console.error(e);
@@ -285,11 +302,17 @@
       config.space_summary !== undefined
         ? config.space_summary
         : DEFAULTS.space_summary;
+    const savedRestore =
+      config.space_restore !== undefined
+        ? config.space_restore
+        : DEFAULTS.space_restore;
 
     const draftSelect = document.getElementById('obp-space-draft');
     const draftText = document.getElementById('obp-space-draft-text');
     const summarySelect = document.getElementById('obp-space-summary');
     const summaryText = document.getElementById('obp-space-summary-text');
+    const restoreSelect = document.getElementById('obp-space-restore');
+    const restoreText = document.getElementById('obp-space-restore-text');
 
     try {
       const res = await kintone.api(
@@ -303,6 +326,7 @@
 
       fillFieldSelect(draftSelect, spaceFields, savedDraft, false);
       fillFieldSelect(summarySelect, spaceFields, savedSummary, true);
+      fillFieldSelect(restoreSelect, spaceFields, savedRestore, true);
     } catch (e) {
       console.error(e);
       draftSelect.style.display = 'none';
@@ -312,7 +336,13 @@
       summarySelect.style.display = 'none';
       summaryText.style.display = '';
       summaryText.value = savedSummary;
+
+      restoreSelect.style.display = 'none';
+      restoreText.style.display = '';
+      restoreText.value = savedRestore;
     }
+
+    updateBackupCheck();
   }
 
   // =========================================================
@@ -468,6 +498,81 @@
     }
 
     updateLengthCheck();
+  }
+
+  // =========================================================
+  // プロンプト自動退避・復元の設定チェック（保存はブロックしない警告のみ）
+  // =========================================================
+  function getFieldRequired(fieldCode) {
+    const meta = getFieldMeta(fieldCode);
+    return !!(meta && meta.required);
+  }
+
+  function updateBackupCheck() {
+    const el = document.getElementById('obp-backup-check');
+    const clearOnEl = document.getElementById('obp-clear-input-after-draft');
+    if (!el || !clearOnEl) {
+      return;
+    }
+
+    const messages = [];
+    const restoreSpace = getSpaceValue(
+      document.getElementById('obp-space-restore'),
+      document.getElementById('obp-space-restore-text'),
+    );
+
+    if (clearOnEl.checked) {
+      const backupField = document.getElementById(
+        'obp-field-input-backup',
+      ).value;
+      if (!backupField) {
+        messages.push(
+          '退避先フィールドが未設定のため、削除されたプロンプトは復元できなくなります。',
+        );
+      }
+
+      const inputField = document.getElementById('obp-field-input').value;
+      if (getFieldRequired(inputField)) {
+        messages.push(
+          '「AIへの指示・メモ」フィールドが必須項目に設定されています。自動削除により必須項目が空になり、保存時にエラーになります。フィールドの必須設定を外してください。',
+        );
+      }
+
+      if (!restoreSpace) {
+        messages.push(
+          '復元ボタン設置スペースが未設定のため、復元ボタンが表示されません。',
+        );
+      }
+    }
+
+    // 復元ボタン設置スペースが下書き/要約ボタンの設置スペースと重複していると
+    // 実行画面で先に描画したボタンが破棄されてしまう（重要1）。
+    // clear_input_after_draft が無効でも復元ボタン自体は表示され得るため、
+    // このチェックはチェックボックスの状態に関わらず行う。
+    // 警告のみで、保存はブロックしない。
+    if (restoreSpace) {
+      const draftSpace = getSpaceValue(
+        document.getElementById('obp-space-draft'),
+        document.getElementById('obp-space-draft-text'),
+      );
+      const summarySpace = getSpaceValue(
+        document.getElementById('obp-space-summary'),
+        document.getElementById('obp-space-summary-text'),
+      );
+      if (restoreSpace === draftSpace || restoreSpace === summarySpace) {
+        messages.push(
+          '復元ボタン設置スペースが他のボタンと重複しています。復元ボタンは表示されません。',
+        );
+      }
+    }
+
+    if (messages.length === 0) {
+      el.style.display = 'none';
+      el.textContent = '';
+    } else {
+      el.style.display = '';
+      el.textContent = messages.join(' / ');
+    }
   }
 
   // =========================================================
@@ -850,6 +955,7 @@
     }
 
     checkPromptDraftWarnings();
+    updateBackupCheck();
 
     const formatInstructionValue = document.getElementById(
       'obp-format-instruction',
@@ -857,6 +963,27 @@
     const formatModeChecked = document.querySelector(
       'input[name="obp-format-mode"]:checked',
     );
+
+    const backupMaxCharsInput = document.getElementById(
+      'obp-backup-max-chars',
+    ).value;
+    const backupMaxCharsTrimmed = (backupMaxCharsInput || '').trim();
+    const backupMaxCharsNum = parseInt(backupMaxCharsTrimmed, 10);
+    let backupMaxCharsFinal;
+    if (
+      backupMaxCharsTrimmed !== '' &&
+      !isNaN(backupMaxCharsNum) &&
+      backupMaxCharsNum >= 0
+    ) {
+      backupMaxCharsFinal = String(backupMaxCharsNum);
+    } else {
+      backupMaxCharsFinal = DEFAULTS.backup_max_chars;
+      alert(
+        '退避の文字数上限に不正な値が入力されていたため、既定値（' +
+          DEFAULTS.backup_max_chars +
+          '字）にフォールバックして保存します。',
+      );
+    }
 
     const newConfig = {
       gemini_model: client.stripModelPrefix(modelName),
@@ -896,6 +1023,19 @@
         ? 'no'
         : 'yes',
       preset_id: appliedPresetId || '',
+      clear_input_after_draft: document.getElementById(
+        'obp-clear-input-after-draft',
+      ).checked
+        ? 'yes'
+        : 'no',
+      field_input_backup: document.getElementById('obp-field-input-backup')
+        .value,
+      space_restore: getSpaceValue(
+        document.getElementById('obp-space-restore'),
+        document.getElementById('obp-space-restore-text'),
+      ),
+      backup_max_chars: backupMaxCharsFinal,
+      btn_label_restore: document.getElementById('obp-btn-label-restore').value,
     };
 
     kintone.plugin.app.setConfig(newConfig, () => {
@@ -1041,6 +1181,23 @@
     const promptDraft = document.getElementById('obp-prompt-draft');
     const saveBtn = document.getElementById('obp-save');
     const cancelBtn = document.getElementById('obp-cancel');
+    const clearInputAfterDraftEl = document.getElementById(
+      'obp-clear-input-after-draft',
+    );
+    const fieldInputEl = document.getElementById('obp-field-input');
+    const fieldInputBackupEl = document.getElementById(
+      'obp-field-input-backup',
+    );
+    const spaceRestoreEl = document.getElementById('obp-space-restore');
+    const spaceRestoreTextEl = document.getElementById(
+      'obp-space-restore-text',
+    );
+    const spaceDraftEl = document.getElementById('obp-space-draft');
+    const spaceDraftTextEl = document.getElementById('obp-space-draft-text');
+    const spaceSummaryEl = document.getElementById('obp-space-summary');
+    const spaceSummaryTextEl = document.getElementById(
+      'obp-space-summary-text',
+    );
 
     apiKeyToggle.addEventListener('click', () => {
       const isPassword = apiKeyEl.type === 'password';
@@ -1118,6 +1275,36 @@
       checkPromptDraftWarnings();
     });
 
+    clearInputAfterDraftEl.addEventListener('change', () => {
+      updateBackupCheck();
+    });
+    fieldInputEl.addEventListener('change', () => {
+      updateBackupCheck();
+    });
+    fieldInputBackupEl.addEventListener('change', () => {
+      updateBackupCheck();
+    });
+    spaceRestoreEl.addEventListener('change', () => {
+      updateBackupCheck();
+    });
+    spaceRestoreTextEl.addEventListener('input', () => {
+      updateBackupCheck();
+    });
+    // 復元ボタン設置スペースの重複警告（重要1）はドラフト/要約側の
+    // スペース変更でも再判定が必要なため、こちらの変更にも反応させる。
+    spaceDraftEl.addEventListener('change', () => {
+      updateBackupCheck();
+    });
+    spaceDraftTextEl.addEventListener('input', () => {
+      updateBackupCheck();
+    });
+    spaceSummaryEl.addEventListener('change', () => {
+      updateBackupCheck();
+    });
+    spaceSummaryTextEl.addEventListener('input', () => {
+      updateBackupCheck();
+    });
+
     saveBtn.addEventListener('click', () => {
       onSaveClick();
     });
@@ -1132,10 +1319,20 @@
       config.btn_label_draft || DEFAULTS.btn_label_draft;
     document.getElementById('obp-btn-label-summary').value =
       config.btn_label_summary || DEFAULTS.btn_label_summary;
+    document.getElementById('obp-btn-label-restore').value =
+      config.btn_label_restore || DEFAULTS.btn_label_restore;
     document.getElementById('obp-prompt-draft').value =
       config.prompt_draft || DEFAULTS.prompt_draft;
     document.getElementById('obp-prompt-summary').value =
       config.prompt_summary || DEFAULTS.prompt_summary;
+
+    document.getElementById('obp-clear-input-after-draft').checked =
+      (config.clear_input_after_draft || DEFAULTS.clear_input_after_draft) ===
+      'yes';
+    document.getElementById('obp-backup-max-chars').value =
+      config.backup_max_chars !== undefined
+        ? config.backup_max_chars
+        : DEFAULTS.backup_max_chars;
 
     document.getElementById('obp-length-default').value =
       config.length_default !== undefined

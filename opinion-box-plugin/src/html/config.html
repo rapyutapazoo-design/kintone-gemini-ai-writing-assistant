@@ -95,6 +95,27 @@
       </div>
 
       <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">プロンプト退避先フィールド</div>
+        <div class="kintoneplugin-desc">
+          「生成後に指示・メモを自動で削除する」をONにした場合に、削除前の内容を退避するフィールドです。文字列（複数行）のみ選択できます。全世代が追記されます。使用しない場合は「（使用しない）」を選択してください（この場合、自動削除は復元不可の単純クリアとして動作します）。
+        </div>
+        <div class="kintoneplugin-input-outer">
+          <select id="obp-field-input-backup" class="kintoneplugin-select"></select>
+        </div>
+      </div>
+
+      <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">復元ボタン設置スペース</div>
+        <div class="kintoneplugin-desc">
+          退避したプロンプトを復元するボタンを設置するスペースフィールドのIDです。退避先フィールドが未設定、またはレコード上の退避内容が空の場合はボタンは表示されません。
+        </div>
+        <div class="kintoneplugin-input-outer">
+          <select id="obp-space-restore" class="kintoneplugin-select"></select>
+          <input type="text" id="obp-space-restore-text" style="display:none" placeholder="スペースIDを入力">
+        </div>
+      </div>
+
+      <div class="kintoneplugin-row">
         <div class="kintoneplugin-label">生成前の上書き確認</div>
         <div class="kintoneplugin-desc">
           件名・本文にすでに入力内容がある状態でAI生成を実行したとき、上書きしてよいか確認ダイアログを表示します。
@@ -125,6 +146,30 @@
   <details class="obp-section" open>
     <summary class="obp-section-heading">4. 生成オプション</summary>
     <div class="obp-section-body">
+      <h3 class="obp-subheading">プロンプトの自動退避・復元</h3>
+
+      <div class="kintoneplugin-row">
+        <label>
+          <input type="checkbox" id="obp-clear-input-after-draft">
+          生成後に指示・メモを自動で削除する
+        </label>
+        <div class="kintoneplugin-desc">
+          ONにすると、下書き生成が成功したときに「AIへの指示・メモ」入力欄を自動でクリアします（既定はOFF。設定を変更しない限り既存アプリの動作は一切変わりません）。「3. フィールド設定」で退避先フィールドを指定している場合は、クリア前の内容が退避先フィールドに追記され、復元ボタンで元に戻せます。
+        </div>
+      </div>
+
+      <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">退避の文字数上限</div>
+        <div class="kintoneplugin-desc">
+          退避先フィールドに保存する全世代の合計文字数の上限です。既定100,000字（約280世代）。0で無制限。上限を超えると古い世代から自動的に削除されます。
+        </div>
+        <div class="kintoneplugin-input-outer">
+          <input type="text" id="obp-backup-max-chars" class="kintoneplugin-input-text">
+        </div>
+      </div>
+
+      <div id="obp-backup-check" class="obp-banner obp-banner-warn" style="display:none"></div>
+
       <h3 class="obp-subheading">文章の長さ</h3>
 
       <div class="kintoneplugin-row">
@@ -262,6 +307,13 @@
         <div class="kintoneplugin-label">要約ボタン文言</div>
         <div class="kintoneplugin-input-outer">
           <input type="text" id="obp-btn-label-summary" class="kintoneplugin-input-text">
+        </div>
+      </div>
+
+      <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">復元ボタン文言</div>
+        <div class="kintoneplugin-input-outer">
+          <input type="text" id="obp-btn-label-restore" class="kintoneplugin-input-text">
         </div>
       </div>
 

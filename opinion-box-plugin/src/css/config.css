@@ -19,7 +19,8 @@
 #obp-api-key,
 #obp-model-manual,
 #obp-btn-label-draft,
-#obp-btn-label-summary {
+#obp-btn-label-summary,
+#obp-btn-label-restore {
   width: 400px;
 }
 
@@ -29,9 +30,15 @@
 #obp-field-subject,
 #obp-field-body,
 #obp-field-summary,
+#obp-field-input-backup,
 #obp-space-draft,
-#obp-space-summary {
+#obp-space-summary,
+#obp-space-restore {
   min-width: 320px;
+}
+
+#obp-backup-max-chars {
+  width: 120px;
 }
 
 #obp-prompt-draft,
