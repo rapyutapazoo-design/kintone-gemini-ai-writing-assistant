@@ -1,0 +1,220 @@
+(function (global) {
+  'use strict';
+
+  // =========================================================
+  // フォーマット定義（確定値）
+  // 「文字数」と同型のデータ構造を将来の利用者選択に備えて用意する。
+  // 現時点では管理者が設定画面で1つを選ぶ固定運用（mode='fixed'）。
+  // =========================================================
+  const FORMAT_OPTIONS = [
+    {
+      id: 'heading_bullet',
+      label: '見出し＋箇条書き（■・）',
+      description:
+        '意見書・タスク・議事録・汎用ビジネス文書向け。最も汎用性が高い既定値。',
+      instruction:
+        '構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行は改行文字で表現すること。Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）とHTMLタグ（<b> <br> <div> <span>など）は一切出力しないこと。',
+    },
+    {
+      id: 'bullet_only',
+      label: '箇条書きのみ（・）',
+      description: 'タスク説明・短い業務連絡向け。100〜200字の短文に適する。',
+      instruction:
+        '見出しは使用せず、・（中黒）による箇条書きのみで簡潔に記述すること。Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）とHTMLタグ（<b> <br> <div> <span>など）は一切出力しないこと。',
+    },
+    {
+      id: 'paragraph',
+      label: '段落文（見出しなし）',
+      description:
+        'メール・依頼文・社外文書向け。挨拶文と結びを含められる唯一の形式。',
+      instruction:
+        '見出しや箇条書きは使用せず、段落による通常の文章として記述すること。段落の区切りは空行で表現すること。Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）とHTMLタグ（<b> <br> <div> <span>など）は一切出力しないこと。',
+    },
+    {
+      id: 'numbered_steps',
+      label: '番号付き手順（1. 2. 3.）',
+      description: '業務マニュアル・手順書向け。順序性を明示できる。',
+      instruction:
+        '作業手順は「1.」「2.」のように半角数字とピリオドで番号を振り、実行順に記述すること。手順以外の補足は■（見出し）で区切ること。Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）とHTMLタグ（<b> <br> <div> <span>など）は一切出力しないこと。',
+    },
+    {
+      id: 'custom',
+      label: 'カスタム（自由記述）',
+      description: '独自のフォーマット指示を記述します。',
+      instruction: '',
+    },
+  ];
+
+  const DEFAULT_FORMAT_ID = 'heading_bullet';
+
+  // =========================================================
+  // 文字数候補の推奨リスト（フィールド作成時の選択肢の目安）
+  // =========================================================
+  const RECOMMENDED_LENGTHS = [
+    '指定なし',
+    '100字程度',
+    '200字程度',
+    '400字程度',
+    '600字程度',
+    '800字程度',
+    '1200字程度',
+  ];
+
+  function getFormatOption(id) {
+    return (
+      FORMAT_OPTIONS.filter(function (f) {
+        return f.id === id;
+      })[0] || null
+    );
+  }
+
+  function getFormatInstructionById(id) {
+    const f = getFormatOption(id);
+    return f ? f.instruction : '';
+  }
+
+  // =========================================================
+  // ラベルからの文字数指示文の動的生成
+  // =========================================================
+  function extractLengthNumber(label) {
+    const m = /(\d{2,5})\s*[字文]/.exec(String(label == null ? '' : label));
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function buildLengthInstructionFromNumber(num) {
+    return num + '文字程度（±20%）の文章';
+  }
+
+  // ラベルから指示文を生成する関数。数値抽出できない場合は汎用の指示文を返す。
+  function buildLengthInstructionFromLabel(label) {
+    const num = extractLengthNumber(label);
+    if (num) {
+      return buildLengthInstructionFromNumber(num);
+    }
+    return '内容量に応じた適切な長さ';
+  }
+
+  // =========================================================
+  // JSONマッピングのパース／シリアライズ（失敗時は既定値へフォールバック）
+  // =========================================================
+  function parseMap(jsonStr, fallback) {
+    const fallbackValue = Array.isArray(fallback) ? fallback : [];
+    if (!jsonStr) {
+      return fallbackValue;
+    }
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      return fallbackValue;
+    } catch {
+      return fallbackValue;
+    }
+  }
+
+  function stringifyMap(map) {
+    try {
+      return JSON.stringify(Array.isArray(map) ? map : []);
+    } catch {
+      return '[]';
+    }
+  }
+
+  function readRecordFieldValue(record, fieldCode) {
+    if (!record || !fieldCode) {
+      return '';
+    }
+    const field = record[fieldCode];
+    if (!field || field.value == null) {
+      return '';
+    }
+    return String(field.value);
+  }
+
+  // =========================================================
+  // 共通解決関数（文字数・フォーマットで共用）
+  //   mode === 'fixed' → map[0].instruction を返す
+  //   mode === 'field' → フィールド値で map を照合して返す
+  // フォールバック順序（mode==='field'時）:
+  //   1. フィールド未設定 or 値が空 → defaultInstruction
+  //   2. 値が map の option と完全一致 → その instruction
+  //   3. 一致しないが値から数値抽出可 → 動的生成した指示文
+  //   4. いずれも不可 → defaultInstruction
+  // =========================================================
+  function resolveOption(mode, fieldCode, map, defaultInstruction, record) {
+    const list = Array.isArray(map) ? map : [];
+    const fallback = defaultInstruction || '';
+
+    if (mode === 'fixed') {
+      const first = list[0];
+      if (first && typeof first.instruction === 'string' && first.instruction) {
+        return first.instruction;
+      }
+      return fallback;
+    }
+
+    // mode === 'field'
+    if (!fieldCode) {
+      return fallback;
+    }
+
+    const value = readRecordFieldValue(record, fieldCode);
+    if (!value) {
+      return fallback;
+    }
+
+    const matched = list.filter(function (item) {
+      return item && item.option === value;
+    })[0];
+    if (
+      matched &&
+      typeof matched.instruction === 'string' &&
+      matched.instruction
+    ) {
+      return matched.instruction;
+    }
+
+    const num = extractLengthNumber(value);
+    if (num) {
+      return buildLengthInstructionFromNumber(num);
+    }
+
+    return fallback;
+  }
+
+  // =========================================================
+  // レガシー互換: length_map 未設定時に現行のハードコード動作を再現する。
+  // 既定 '200文字程度の簡潔な文章'。値に '400' を含めば '400文字程度の標準的な文章'、
+  // '600' を含めば '600文字程度の詳細な文章'（後勝ち）。
+  // この互換性は既存アプリのデグレ防止のため最重要。
+  // =========================================================
+  function legacyLengthInstruction(value) {
+    let lengthInstruction = '200文字程度の簡潔な文章';
+    const str = value || '';
+    if (str) {
+      if (str.indexOf('400') !== -1) {
+        lengthInstruction = '400文字程度の標準的な文章';
+      }
+      if (str.indexOf('600') !== -1) {
+        lengthInstruction = '600文字程度の詳細な文章';
+      }
+    }
+    return lengthInstruction;
+  }
+
+  global.GeminiGenerationOptions = {
+    FORMAT_OPTIONS: FORMAT_OPTIONS,
+    DEFAULT_FORMAT_ID: DEFAULT_FORMAT_ID,
+    RECOMMENDED_LENGTHS: RECOMMENDED_LENGTHS,
+    getFormatOption: getFormatOption,
+    getFormatInstructionById: getFormatInstructionById,
+    extractLengthNumber: extractLengthNumber,
+    buildLengthInstructionFromNumber: buildLengthInstructionFromNumber,
+    buildLengthInstructionFromLabel: buildLengthInstructionFromLabel,
+    parseMap: parseMap,
+    stringifyMap: stringifyMap,
+    resolveOption: resolveOption,
+    legacyLengthInstruction: legacyLengthInstruction,
+  };
+})(window);

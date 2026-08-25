@@ -4,6 +4,7 @@
   // 設定読み込み
   const config = kintone.plugin.app.getConfig(PLUGIN_ID) || {};
   const client = window.GeminiPluginClient;
+  const genOpts = window.GeminiGenerationOptions;
 
   const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
 以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
@@ -13,7 +14,7 @@
 1. 文字数目安: {{lengthInstruction}}
 2. 挨拶文、署名は一切禁止。
 3. 「です・ます」調。
-4. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用しないこと。HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行はそのまま改行文字で表現すること。
+4. {{formatInstruction}}
 【メモ】
 {{input}}`;
 
@@ -40,6 +41,9 @@
       : config.field_subject;
   const F_BODY = config.field_body || 'opinion_body';
   const F_SUMMARY = config.field_summary || 'ai_summary';
+  // 将来、利用者がフォーマットを選択できるようにするための予約フィールド。
+  // format_mode が 'field' に切り替わって初めて参照される（現状は常に 'fixed'）。
+  const F_FORMAT = config.field_format || '';
   const SPACE_DRAFT = config.space_draft || 'btn_space_draft';
   const SPACE_SUMMARY = config.space_summary || 'btn_space_summary';
   const SUMMARY_ON = (config.summary_enabled || 'yes') !== 'no';
@@ -47,6 +51,23 @@
   const LABEL_SUMMARY = config.btn_label_summary || 'Geminiで要約';
   const PROMPT_DRAFT = config.prompt_draft || DEFAULT_PROMPT_DRAFT;
   const PROMPT_SUMMARY = config.prompt_summary || DEFAULT_PROMPT_SUMMARY;
+
+  // 文字数マッピング。length_map が未設定/空の場合は、後段で
+  // legacyLengthInstruction() による現行ハードコード動作の完全再現にフォールバックする。
+  const LENGTH_MODE = config.length_mode || 'field';
+  const LENGTH_MAP = genOpts.parseMap(config.length_map, []);
+  const LENGTH_DEFAULT = config.length_default || '';
+
+  // フォーマットマッピング。format_map が未設定/空の場合は既定フォーマット
+  // （heading_bullet）の instruction にフォールバックする。
+  const FORMAT_MODE = config.format_mode || 'fixed';
+  const FORMAT_MAP = genOpts.parseMap(config.format_map, []);
+  const FORMAT_DEFAULT =
+    config.format_default ||
+    genOpts.getFormatInstructionById(genOpts.DEFAULT_FORMAT_ID);
+
+  // 出力先の上書き保護（既定 'yes' = 確認する）
+  const OVERWRITE_CONFIRM = (config.overwrite_confirm || 'yes') !== 'no';
 
   function renderTemplate(tpl, vars) {
     return String(tpl).replace(/\{\{(\w+)\}\}/g, (m, key) =>
@@ -216,6 +237,55 @@
   // =========================================================
   // 4. AI処理ロジック
   // =========================================================
+
+  // 本文・件名にすでに値がある状態でAI生成を実行しようとしていないかを確認する。
+  // OVERWRITE_CONFIRM が無効、または上書き対象の値が空ならそのまま続行してよい。
+  function confirmOverwriteIfNeeded(record) {
+    if (!OVERWRITE_CONFIRM) {
+      return true;
+    }
+    const bodyField = record[F_BODY];
+    const subjectField = F_SUBJECT ? record[F_SUBJECT] : null;
+    const bodyHasValue =
+      !!bodyField && !client.isFieldValueEmpty(bodyField.value, bodyField.type);
+    const subjectHasValue =
+      !!subjectField &&
+      !client.isFieldValueEmpty(subjectField.value, subjectField.type);
+    if (!bodyHasValue && !subjectHasValue) {
+      return true;
+    }
+    return confirm(
+      '本文または件名に既に入力内容があります。AIの生成結果で上書きしますか？',
+    );
+  }
+
+  // 文字数の指示文を決定する。length_map 未設定時は現行のハードコード動作
+  // （200/400/600文字）を完全再現する（デグレ防止のため最優先）。
+  function resolveLengthInstruction(lengthOption, record) {
+    if (LENGTH_MAP.length === 0) {
+      return genOpts.legacyLengthInstruction(lengthOption);
+    }
+    const lengthFallback =
+      LENGTH_DEFAULT || genOpts.legacyLengthInstruction(lengthOption);
+    return genOpts.resolveOption(
+      LENGTH_MODE,
+      F_LENGTH,
+      LENGTH_MAP,
+      lengthFallback,
+      record,
+    );
+  }
+
+  function resolveFormatInstruction(record) {
+    return genOpts.resolveOption(
+      FORMAT_MODE,
+      F_FORMAT,
+      FORMAT_MAP,
+      FORMAT_DEFAULT,
+      record,
+    );
+  }
+
   async function generateDraft(isMobile) {
     const appManager = isMobile ? kintone.mobile.app : kintone.app;
     const recordData = appManager.record.get();
@@ -234,17 +304,17 @@
       return;
     }
 
-    let lengthInstruction = '200文字程度の簡潔な文章';
-    if (lengthOption) {
-      if (lengthOption.indexOf('400') !== -1)
-        lengthInstruction = '400文字程度の標準的な文章';
-      if (lengthOption.indexOf('600') !== -1)
-        lengthInstruction = '600文字程度の詳細な文章';
+    if (!confirmOverwriteIfNeeded(recordData.record)) {
+      return;
     }
 
     const prompt = renderTemplate(PROMPT_DRAFT, {
       input: keyword,
-      lengthInstruction: lengthInstruction,
+      lengthInstruction: resolveLengthInstruction(
+        lengthOption,
+        recordData.record,
+      ),
+      formatInstruction: resolveFormatInstruction(recordData.record),
     });
 
     showSpinner();

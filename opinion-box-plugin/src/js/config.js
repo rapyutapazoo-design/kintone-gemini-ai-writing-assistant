@@ -2,55 +2,13 @@
   'use strict';
 
   const client = window.GeminiPluginClient;
+  const genOpts = window.GeminiGenerationOptions;
+  const presets = window.GeminiPromptPresets;
 
-  const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
-以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
-【出力フォーマット】
-{ "subject": "件名(20文字以内)", "body": "本文" }
-【本文の条件】
-1. 文字数目安: {{lengthInstruction}}
-2. 挨拶文、署名は一切禁止。
-3. 「です・ます」調。
-4. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用しないこと。HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行はそのまま改行文字で表現すること。
-【メモ】
-{{input}}`;
-
-  const DEFAULT_PROMPT_SUMMARY = `あなたはマンション管理組合の理事会資料作成担当です。
-以下の意見書の内容を、理事会資料として適切な長さに要約してください。
-
-【要約のルール】
-1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。
-2. 短い意見は一言で簡潔に、複雑な背景がある意見は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。
-3. 冗長な表現は避け、事実関係を明確にしてください。
-4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。
-5. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用せず、HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。改行はそのまま改行文字で表現すること。
-
-【本文】
-{{body}}`;
-
-  const CONTACT_PROMPT_DRAFT = `あなたは、マンション管理組合の「デジタル委員会」が運営するお問い合わせ窓口の下書き作成アシスタントです。
-以下の「利用者からの指示・メモ」をもとに、デジタル委員会宛てのお問い合わせ内容として、丁寧語（です・ます調）で件名と本文の下書きを作成してください。
-Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用しないこと。HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。構造の表現には■（見出し）と・（箇条書き）のみを使用し、改行はそのまま改行文字で表現すること。
-
-【出力形式】
-必ず次の形式のJSONのみを出力してください。前後に説明文やコードフェンス（\`\`\`など）は一切付けないでください。
-{"subject": "件名", "body": "本文"}
-
-【利用者からの指示・メモ】
-{{input}}`;
-
-  const CONTACT_PROMPT_SUMMARY = `あなたはマンション管理組合の理事会資料作成担当です。
-以下のお問い合わせ内容を、理事会資料として適切な長さに要約してください。
-
-【要約のルール】
-1. 具体的な行数制限は設けません。元の文章量や内容の複雑さに応じて、効率的に内容を把握できる適切な長さに調整してください。
-2. 短い内容は一言で簡潔に、複雑な背景がある内容は重要な詳細（日付、場所、経緯など）を漏らさないように要約してください。
-3. 冗長な表現は避け、事実関係を明確にしてください。
-4. 見出し（■など）と箇条書き（・）を用いて、人間が一目で読みやすいレイアウトで出力してください。
-5. Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフェンスなど）は使用せず、HTMLタグ（<b> <br> <div> <span>など）も出力しないこと。改行はそのまま改行文字で表現すること。
-
-【本文】
-{{body}}`;
+  const OPINION_PRESET = presets.getPreset('opinion');
+  const DEFAULT_FORMAT_INSTRUCTION = genOpts.getFormatInstructionById(
+    genOpts.DEFAULT_FORMAT_ID,
+  );
 
   const DEFAULTS = {
     gemini_model: 'gemini-2.5-flash',
@@ -59,13 +17,24 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     field_subject: 'opinion_subject',
     field_body: 'opinion_body',
     field_summary: 'ai_summary',
+    field_format: '',
     space_draft: 'btn_space_draft',
     space_summary: 'btn_space_summary',
     summary_enabled: 'yes',
-    btn_label_draft: 'Geminiで件名・本文を作成',
-    btn_label_summary: 'Geminiで要約',
-    prompt_draft: DEFAULT_PROMPT_DRAFT,
-    prompt_summary: DEFAULT_PROMPT_SUMMARY,
+    btn_label_draft: OPINION_PRESET.btn_label_draft,
+    btn_label_summary: OPINION_PRESET.btn_label_summary,
+    prompt_draft: OPINION_PRESET.prompt_draft,
+    prompt_summary: OPINION_PRESET.prompt_summary,
+    length_mode: 'field',
+    length_map: '[]',
+    length_default: '',
+    format_mode: 'fixed',
+    format_map: genOpts.stringifyMap([
+      { option: '', instruction: DEFAULT_FORMAT_INSTRUCTION },
+    ]),
+    format_default: DEFAULT_FORMAT_INSTRUCTION,
+    overwrite_confirm: 'yes',
+    preset_id: '',
   };
 
   const STRUCTURE_PRESET_COMMON = {
@@ -79,24 +48,13 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     summary_enabled: 'yes',
   };
 
-  const WORDING_PRESET_OPINION = {
-    btn_label_draft: 'Geminiで件名・本文を作成',
-    btn_label_summary: 'Geminiで要約',
-    prompt_draft: DEFAULT_PROMPT_DRAFT,
-    prompt_summary: DEFAULT_PROMPT_SUMMARY,
-  };
-
-  const WORDING_PRESET_CONTACT = {
-    btn_label_draft: 'Geminiで下書きを作成',
-    btn_label_summary: 'Geminiで要約',
-    prompt_draft: CONTACT_PROMPT_DRAFT,
-    prompt_summary: CONTACT_PROMPT_SUMMARY,
-  };
-
   const config = kintone.plugin.app.getConfig(PLUGIN_ID) || {};
 
   let validationSeq = 0;
   let lastValidation = null;
+  let fieldMetaCache = {};
+  let currentLengthRows = genOpts.parseMap(config.length_map, []);
+  let appliedPresetId = config.preset_id || '';
 
   function showMessage(type, text) {
     const el = document.getElementById('obp-message');
@@ -198,13 +156,37 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     });
   }
 
+  // =========================================================
+  // フィールドメタ情報（選択肢を含む）のキャッシュ構築
+  // =========================================================
+  function buildFieldMetaCache(properties) {
+    const meta = {};
+    Object.keys(properties || {}).forEach((code) => {
+      const f = properties[code];
+      const options = [];
+      if (f.options) {
+        Object.keys(f.options).forEach((label) => {
+          const idx = parseInt(f.options[label].index, 10);
+          options.push({ label: label, index: isNaN(idx) ? 0 : idx });
+        });
+        options.sort((a, b) => a.index - b.index);
+      }
+      meta[code] = {
+        type: f.type,
+        options: options.map((o) => o.label),
+      };
+    });
+    fieldMetaCache = meta;
+  }
+
   async function loadFields() {
     const typeMap = {
       'obp-field-input': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT', 'RICH_TEXT'],
       'obp-field-body': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT', 'RICH_TEXT'],
-      'obp-field-summary': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT'],
+      'obp-field-summary': ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT', 'RICH_TEXT'],
       'obp-field-subject': ['SINGLE_LINE_TEXT'],
       'obp-field-length': ['DROP_DOWN', 'RADIO_BUTTON', 'SINGLE_LINE_TEXT'],
+      'obp-field-format': ['DROP_DOWN', 'RADIO_BUTTON', 'SINGLE_LINE_TEXT'],
     };
     const allowEmptyMap = {
       'obp-field-input': false,
@@ -212,6 +194,7 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       'obp-field-summary': true,
       'obp-field-subject': true,
       'obp-field-length': true,
+      'obp-field-format': true,
     };
     const savedMap = {
       'obp-field-input':
@@ -234,6 +217,10 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
         config.field_length !== undefined
           ? config.field_length
           : DEFAULTS.field_length,
+      'obp-field-format':
+        config.field_format !== undefined
+          ? config.field_format
+          : DEFAULTS.field_format,
     };
 
     try {
@@ -245,6 +232,8 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       const allFields = Object.keys(res.properties).map(
         (code) => res.properties[code],
       );
+
+      buildFieldMetaCache(res.properties);
 
       Object.keys(typeMap).forEach((id) => {
         const el = document.getElementById(id);
@@ -261,10 +250,29 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
         'warn',
         'フィールド一覧の取得に失敗しました。保存済みの設定値のみを表示しています。',
       );
+      fieldMetaCache = {};
       Object.keys(typeMap).forEach((id) => {
         const el = document.getElementById(id);
         fillFieldSelect(el, [], savedMap[id], allowEmptyMap[id]);
       });
+    }
+
+    renderLengthMapTable();
+  }
+
+  async function reloadFieldMeta() {
+    try {
+      const res = await kintone.api(
+        kintone.api.url('/k/v1/preview/app/form/fields', true),
+        'GET',
+        { app: kintone.app.getId() },
+      );
+      buildFieldMetaCache(res.properties);
+      renderLengthMapTable();
+      showMessage('info', 'フィールドの選択肢を再読込しました。');
+    } catch (e) {
+      console.error(e);
+      showMessage('warn', 'フィールドの選択肢の再読込に失敗しました。');
     }
   }
 
@@ -305,6 +313,341 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       summaryText.style.display = '';
       summaryText.value = savedSummary;
     }
+  }
+
+  // =========================================================
+  // 文字数マッピング表
+  // =========================================================
+  function getFieldMeta(fieldCode) {
+    return fieldMetaCache[fieldCode] || null;
+  }
+
+  function isManualLengthMode(fieldCode) {
+    const meta = getFieldMeta(fieldCode);
+    if (!fieldCode || !meta) {
+      return true;
+    }
+    return meta.type === 'SINGLE_LINE_TEXT';
+  }
+
+  function getFieldOptions(fieldCode) {
+    const meta = getFieldMeta(fieldCode);
+    return meta ? meta.options : [];
+  }
+
+  function updateLengthCheck() {
+    const el = document.getElementById('obp-length-check');
+    const fieldCode = document.getElementById('obp-field-length').value;
+    const messages = [];
+
+    if (currentLengthRows.length === 0) {
+      messages.push(
+        '文字数マッピングが未設定のため、互換モード（既存のハードコード動作: 200/400/600文字）で動作します。',
+      );
+    } else {
+      const emptyOptions = currentLengthRows
+        .filter((r) => r.option && !r.instruction)
+        .map((r) => r.option);
+      if (emptyOptions.length > 0) {
+        messages.push(
+          '指示文が空の選択肢があります: ' + emptyOptions.join('、'),
+        );
+      }
+
+      if (fieldCode) {
+        const fieldOptions = getFieldOptions(fieldCode);
+        if (fieldOptions.length > 0) {
+          const orphan = currentLengthRows
+            .filter((r) => r.option && fieldOptions.indexOf(r.option) === -1)
+            .map((r) => r.option);
+          if (orphan.length > 0) {
+            messages.push(
+              'マッピングにあるが、フィールドに存在しない選択肢があります: ' +
+                orphan.join('、'),
+            );
+          }
+        }
+      }
+    }
+
+    if (messages.length > 0) {
+      el.style.display = '';
+      el.textContent = messages.join(' / ');
+    } else {
+      el.style.display = 'none';
+      el.textContent = '';
+    }
+  }
+
+  function renderLengthMapTable() {
+    const fieldCode = document.getElementById('obp-field-length').value;
+    const manual = isManualLengthMode(fieldCode);
+    const tbody = document.getElementById('obp-length-map-body');
+    tbody.innerHTML = '';
+
+    let rows;
+    if (manual) {
+      rows =
+        currentLengthRows.length > 0
+          ? currentLengthRows
+          : [{ option: '', instruction: '' }];
+    } else {
+      const options = getFieldOptions(fieldCode);
+      rows = options.map((opt) => {
+        const existing = currentLengthRows.filter((r) => r.option === opt)[0];
+        return {
+          option: opt,
+          instruction: existing ? existing.instruction : '',
+        };
+      });
+    }
+    currentLengthRows = rows;
+
+    rows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+
+      const optTd = document.createElement('td');
+      if (manual) {
+        const optInput = document.createElement('input');
+        optInput.type = 'text';
+        optInput.value = row.option;
+        optInput.className = 'obp-map-option-input';
+        optInput.addEventListener('input', () => {
+          currentLengthRows[idx].option = optInput.value;
+          updateLengthCheck();
+        });
+        optTd.appendChild(optInput);
+      } else {
+        optTd.textContent = row.option;
+        optTd.className = 'obp-map-option-readonly';
+      }
+      tr.appendChild(optTd);
+
+      const instTd = document.createElement('td');
+      const instInput = document.createElement('input');
+      instInput.type = 'text';
+      instInput.value = row.instruction;
+      instInput.className = 'obp-map-instruction-input';
+      instInput.addEventListener('input', () => {
+        currentLengthRows[idx].instruction = instInput.value;
+        updateLengthCheck();
+      });
+      instTd.appendChild(instInput);
+      tr.appendChild(instTd);
+
+      const delTd = document.createElement('td');
+      if (manual) {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = '削除';
+        delBtn.addEventListener('click', () => {
+          currentLengthRows.splice(idx, 1);
+          renderLengthMapTable();
+        });
+        delTd.appendChild(delBtn);
+      }
+      tr.appendChild(delTd);
+
+      tbody.appendChild(tr);
+    });
+
+    if (manual) {
+      const addTr = document.createElement('tr');
+      const addTd = document.createElement('td');
+      addTd.colSpan = 3;
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.textContent = '行を追加';
+      addBtn.addEventListener('click', () => {
+        currentLengthRows.push({ option: '', instruction: '' });
+        renderLengthMapTable();
+      });
+      addTd.appendChild(addBtn);
+      addTr.appendChild(addTd);
+      tbody.appendChild(addTr);
+    }
+
+    updateLengthCheck();
+  }
+
+  // =========================================================
+  // フォーマット設定
+  // =========================================================
+  function populateFormatSelect() {
+    const select = document.getElementById('obp-format-select');
+    select.innerHTML = '';
+    genOpts.FORMAT_OPTIONS.forEach((f) => {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = f.label;
+      select.appendChild(opt);
+    });
+  }
+
+  function loadFormatFromConfig() {
+    const map = genOpts.parseMap(config.format_map, []);
+    const instruction =
+      (map[0] && map[0].instruction) ||
+      config.format_default ||
+      DEFAULTS.format_default;
+    const matchedFormat = genOpts.FORMAT_OPTIONS.filter(
+      (f) => f.id !== 'custom' && f.instruction === instruction,
+    )[0];
+    const formatId = matchedFormat ? matchedFormat.id : 'custom';
+    document.getElementById('obp-format-select').value = formatId;
+    document.getElementById('obp-format-instruction').value = instruction;
+  }
+
+  // =========================================================
+  // 用途プリセット
+  // =========================================================
+  function populatePresetSelect() {
+    const select = document.getElementById('obp-preset-select');
+    select.innerHTML = '';
+    const categories = ['opinion', 'contact', 'document'];
+    categories.forEach((cat) => {
+      const presetsInCat = presets.PRESETS.filter((p) => p.category === cat);
+      if (presetsInCat.length === 0) {
+        return;
+      }
+      const group = document.createElement('optgroup');
+      group.label = presets.CATEGORY_LABELS[cat] || cat;
+      presetsInCat.forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.label;
+        group.appendChild(opt);
+      });
+      select.appendChild(group);
+    });
+
+    const initial = config.preset_id || 'opinion';
+    if (presets.getPreset(initial)) {
+      select.value = initial;
+    }
+    updatePresetDescription();
+  }
+
+  function updatePresetDescription() {
+    const id = document.getElementById('obp-preset-select').value;
+    const preset = presets.getPreset(id);
+    document.getElementById('obp-preset-description').textContent = preset
+      ? preset.description
+      : '';
+  }
+
+  function updatePresetCurrentLabel() {
+    const el = document.getElementById('obp-preset-current');
+    const id = config.preset_id;
+    if (!id) {
+      el.textContent = '未適用（個別項目のみで設定されています）';
+      return;
+    }
+    const preset = presets.getPreset(id);
+    el.textContent = preset
+      ? '現在: ' + preset.label
+      : '現在: ' + id + '（不明なプリセットIDです）';
+  }
+
+  function applyPromptPreset(id) {
+    const preset = presets.getPreset(id);
+    if (!preset) {
+      return;
+    }
+    if (
+      !confirm(
+        '現在のボタン文言・プロンプト・フォーマット・要約設定を「' +
+          preset.label +
+          '」の内容で上書きします。よろしいですか？',
+      )
+    ) {
+      return;
+    }
+
+    document.getElementById('obp-btn-label-draft').value =
+      preset.btn_label_draft;
+    document.getElementById('obp-btn-label-summary').value =
+      preset.btn_label_summary;
+    document.getElementById('obp-prompt-draft').value = preset.prompt_draft;
+    document.getElementById('obp-prompt-summary').value = preset.prompt_summary;
+
+    document.getElementById('obp-format-select').value =
+      preset.default_format_id;
+    const f = genOpts.getFormatOption(preset.default_format_id);
+    document.getElementById('obp-format-instruction').value = f
+      ? f.instruction
+      : '';
+
+    const summaryOn = !!preset.summary_enabled;
+    document.getElementById('obp-summary-enabled').checked = summaryOn;
+    document.getElementById('obp-summary-section').style.display = summaryOn
+      ? ''
+      : 'none';
+
+    appliedPresetId = preset.id;
+    checkPromptDraftWarnings();
+  }
+
+  // =========================================================
+  // プロンプト保存時警告（{{lengthInstruction}} / {{formatInstruction}}）
+  // =========================================================
+  function checkPromptDraftWarnings() {
+    const promptDraft = document.getElementById('obp-prompt-draft').value;
+    const warnEl = document.getElementById('obp-prompt-draft-warning');
+    const hasLength = promptDraft.indexOf('{{lengthInstruction}}') !== -1;
+    const hasFormat = promptDraft.indexOf('{{formatInstruction}}') !== -1;
+
+    const messages = [];
+    if (!hasLength) {
+      messages.push(
+        '{{lengthInstruction}} が含まれていないため、文字数の指定が生成結果に反映されません。',
+      );
+    }
+    if (!hasFormat) {
+      messages.push(
+        '{{formatInstruction}} が含まれていないため、フォーマット設定が生成結果に反映されません。',
+      );
+    }
+
+    if (messages.length === 0) {
+      warnEl.style.display = 'none';
+      warnEl.innerHTML = '';
+      return true;
+    }
+
+    warnEl.style.display = '';
+    warnEl.innerHTML = '';
+    const textEl = document.createElement('div');
+    textEl.textContent = messages.join(' ');
+    warnEl.appendChild(textEl);
+
+    if (!hasFormat) {
+      const updateBtn = document.createElement('button');
+      updateBtn.type = 'button';
+      updateBtn.textContent = 'プロンプトを最新形式に更新する';
+      updateBtn.addEventListener('click', () => {
+        const presetId = document.getElementById('obp-preset-select').value;
+        const preset = presets.getPreset(presetId);
+        if (!preset) {
+          alert('更新元の用途プリセットを選択してください。');
+          return;
+        }
+        if (
+          !confirm(
+            'プロンプトを「' +
+              preset.label +
+              '」の最新プロンプトで上書きします。よろしいですか？',
+          )
+        ) {
+          return;
+        }
+        document.getElementById('obp-prompt-draft').value = preset.prompt_draft;
+        checkPromptDraftWarnings();
+      });
+      warnEl.appendChild(updateBtn);
+    }
+
+    return false;
   }
 
   function buildModelOptions(models) {
@@ -506,6 +849,15 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       }
     }
 
+    checkPromptDraftWarnings();
+
+    const formatInstructionValue = document.getElementById(
+      'obp-format-instruction',
+    ).value;
+    const formatModeChecked = document.querySelector(
+      'input[name="obp-format-mode"]:checked',
+    );
+
     const newConfig = {
       gemini_model: client.stripModelPrefix(modelName),
       field_input: document.getElementById('obp-field-input').value,
@@ -513,6 +865,7 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       field_subject: document.getElementById('obp-field-subject').value,
       field_body: document.getElementById('obp-field-body').value,
       field_summary: document.getElementById('obp-field-summary').value,
+      field_format: document.getElementById('obp-field-format').value,
       space_draft: getSpaceValue(
         document.getElementById('obp-space-draft'),
         document.getElementById('obp-space-draft-text'),
@@ -528,6 +881,21 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       btn_label_summary: document.getElementById('obp-btn-label-summary').value,
       prompt_draft: document.getElementById('obp-prompt-draft').value,
       prompt_summary: document.getElementById('obp-prompt-summary').value,
+      length_mode: 'field',
+      length_map: genOpts.stringifyMap(
+        currentLengthRows.filter((r) => r.option || r.instruction),
+      ),
+      length_default: document.getElementById('obp-length-default').value,
+      format_mode: formatModeChecked ? formatModeChecked.value : 'fixed',
+      format_map: genOpts.stringifyMap([
+        { option: '', instruction: formatInstructionValue },
+      ]),
+      format_default: formatInstructionValue,
+      overwrite_confirm: document.getElementById('obp-overwrite-confirm-no')
+        .checked
+        ? 'no'
+        : 'yes',
+      preset_id: appliedPresetId || '',
     };
 
     kintone.plugin.app.setConfig(newConfig, () => {
@@ -569,6 +937,9 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
         return;
       }
     }
+
+    // {{lengthInstruction}} / {{formatInstruction}} の欠落は警告のみで保存はブロックしない
+    checkPromptDraftWarnings();
 
     if (!lastValidation || lastValidation.model !== modelName) {
       await validateSelectedModel();
@@ -641,21 +1012,8 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     document.getElementById('obp-summary-section').style.display = summaryOn
       ? ''
       : 'none';
-  }
 
-  function applyWordingPreset(preset) {
-    if (
-      !confirm('現在のボタン文言・プロンプトを上書きします。よろしいですか？')
-    ) {
-      return;
-    }
-
-    document.getElementById('obp-btn-label-draft').value =
-      preset.btn_label_draft;
-    document.getElementById('obp-btn-label-summary').value =
-      preset.btn_label_summary;
-    document.getElementById('obp-prompt-draft').value = preset.prompt_draft;
-    document.getElementById('obp-prompt-summary').value = preset.prompt_summary;
+    renderLengthMapTable();
   }
 
   function backToFlowScreen() {
@@ -672,12 +1030,15 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     const summaryEnabledEl = document.getElementById('obp-summary-enabled');
     const summarySection = document.getElementById('obp-summary-section');
     const presetStructure = document.getElementById('obp-preset-structure');
-    const presetWordingOpinion = document.getElementById(
-      'obp-preset-wording-opinion',
+    const presetApply = document.getElementById('obp-preset-apply');
+    const presetSelect = document.getElementById('obp-preset-select');
+    const fieldLengthSelect = document.getElementById('obp-field-length');
+    const lengthReload = document.getElementById('obp-length-reload');
+    const lengthRecommendCopy = document.getElementById(
+      'obp-length-recommend-copy',
     );
-    const presetWordingContact = document.getElementById(
-      'obp-preset-wording-contact',
-    );
+    const formatSelect = document.getElementById('obp-format-select');
+    const promptDraft = document.getElementById('obp-prompt-draft');
     const saveBtn = document.getElementById('obp-save');
     const cancelBtn = document.getElementById('obp-cancel');
 
@@ -718,12 +1079,44 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     presetStructure.addEventListener('click', () =>
       applyStructurePreset(STRUCTURE_PRESET_COMMON),
     );
-    presetWordingOpinion.addEventListener('click', () =>
-      applyWordingPreset(WORDING_PRESET_OPINION),
+
+    presetSelect.addEventListener('change', updatePresetDescription);
+    presetApply.addEventListener('click', () =>
+      applyPromptPreset(presetSelect.value),
     );
-    presetWordingContact.addEventListener('click', () =>
-      applyWordingPreset(WORDING_PRESET_CONTACT),
-    );
+
+    fieldLengthSelect.addEventListener('change', () => {
+      renderLengthMapTable();
+    });
+
+    lengthReload.addEventListener('click', () => {
+      reloadFieldMeta();
+    });
+
+    lengthRecommendCopy.addEventListener('click', async () => {
+      const text = genOpts.RECOMMENDED_LENGTHS.join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        showMessage('info', '推奨選択肢をクリップボードにコピーしました。');
+      } catch (e) {
+        console.error(e);
+        alert(
+          'コピーに失敗しました。以下の文字列を手動でコピーしてください:\n' +
+            text,
+        );
+      }
+    });
+
+    formatSelect.addEventListener('change', () => {
+      const f = genOpts.getFormatOption(formatSelect.value);
+      document.getElementById('obp-format-instruction').value = f
+        ? f.instruction
+        : '';
+    });
+
+    promptDraft.addEventListener('input', () => {
+      checkPromptDraftWarnings();
+    });
 
     saveBtn.addEventListener('click', () => {
       onSaveClick();
@@ -744,6 +1137,30 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
     document.getElementById('obp-prompt-summary').value =
       config.prompt_summary || DEFAULTS.prompt_summary;
 
+    document.getElementById('obp-length-default').value =
+      config.length_default !== undefined
+        ? config.length_default
+        : DEFAULTS.length_default;
+    document.getElementById('obp-length-recommend-list').textContent =
+      genOpts.RECOMMENDED_LENGTHS.join('、');
+
+    const overwriteVal = config.overwrite_confirm || DEFAULTS.overwrite_confirm;
+    document.getElementById(
+      overwriteVal === 'no'
+        ? 'obp-overwrite-confirm-no'
+        : 'obp-overwrite-confirm-yes',
+    ).checked = true;
+
+    const formatModeVal = config.format_mode || DEFAULTS.format_mode;
+    const formatModeEl = document.getElementById(
+      formatModeVal === 'field'
+        ? 'obp-format-mode-field'
+        : 'obp-format-mode-fixed',
+    );
+    if (formatModeEl) {
+      formatModeEl.checked = true;
+    }
+
     const summaryOn =
       (config.summary_enabled || DEFAULTS.summary_enabled) !== 'no';
     document.getElementById('obp-summary-enabled').checked = summaryOn;
@@ -752,6 +1169,12 @@ Markdown記法（**太字**、##見出し、-や*の箇条書き、コードフ�
       : 'none';
 
     toggleManualMode(false);
+
+    populatePresetSelect();
+    updatePresetCurrentLabel();
+    populateFormatSelect();
+    loadFormatFromConfig();
+    checkPromptDraftWarnings();
 
     bindEvents();
     loadFields();

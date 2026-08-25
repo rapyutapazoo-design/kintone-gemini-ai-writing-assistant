@@ -1,11 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/kintone/js-sdk/%40kintone/plugin-manifest-validator%4010.2.0/packages/plugin-manifest-validator/manifest-schema.json",
   "manifest_version": 1,
-  "version": 3,
+  "version": 4,
   "type": "APP",
   "desktop": {
     "js": [
       "js/gemini-client.js",
+      "js/generation-options.js",
       "js/desktop.js"
     ],
     "css": [
@@ -18,6 +19,8 @@
     "html": "html/config.html",
     "js": [
       "js/gemini-client.js",
+      "js/generation-options.js",
+      "js/prompt-presets.js",
       "js/config.js"
     ],
     "css": [
@@ -29,16 +32,17 @@
     ]
   },
   "name": {
-    "en": "opinion-box-plugin",
-    "ja": "Opinion Box プラグイン"
+    "en": "ai-writing-assistant-plugin",
+    "ja": "AI文章作成アシスタント（Gemini）"
   },
   "description": {
-    "en": "opinion-box-plugin",
-    "ja": "生成AI（Gemini）で件名・本文の下書きと要約を行うプラグイン。フィールドやプロンプトは設定画面で変更でき、意見書・お問い合わせなど複数アプリで利用できます。"
+    "en": "ai-writing-assistant-plugin",
+    "ja": "生成AI（Gemini）で件名・本文の下書きと要約を行うプラグイン。意見書・お問い合わせ・タスク説明・業務マニュアル・議事録・業務連絡など、複数の用途プリセットから選んで利用できます。フィールドやプロンプトは設定画面で変更でき、複数アプリで利用できます。"
   },
   "mobile": {
     "js": [
       "js/gemini-client.js",
+      "js/generation-options.js",
       "js/desktop.js"
     ],
     "css": [
