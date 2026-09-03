@@ -88,6 +88,27 @@
 【メモ】
 {{input}}`;
 
+  const ANNOUNCEMENT_PROMPT_DRAFT = `あなたは、マンション管理組合が居住者向けに配布・掲示するお知らせ文の作成アシスタントです。
+以下の【メモ】をもとに、居住者向けのお知らせ（掲示文）として、丁寧語（です・ます調）で件名と本文を作成してください。
+{{formatInstruction}}
+
+【本文の条件】
+1. 文字数目安: {{lengthInstruction}}
+2. 冒頭に挨拶（例:「日頃より管理組合の運営にご協力いただき、誠にありがとうございます。」等）を必ず含めること。時候の挨拶は不要。
+3. 命令調は使用せず、依頼・お願いの表現を用いること。
+4. 専門用語（長期修繕計画、共用部、専有部など）は、初出時に平易な補足を添えること。
+5. メモに記載のない日時・場所・費用・連絡先を創作しないこと。記載がなく必要な項目は「（要記入）」と明記すること。
+
+【件名の条件】
+掲示物の表題として20字程度で簡潔にすること。
+
+【出力形式】
+必ず次の形式のJSONのみを出力してください。前後に説明文やコードフェンス（\`\`\`など）は一切付けないでください。
+{"subject": "件名", "body": "本文"}
+
+【メモ】
+{{input}}`;
+
   const TASK_PROMPT_DRAFT = `あなたは、業務用のタスク説明文を作成するアシスタントです。
 以下の【メモ】をもとに、タスクの説明文として件名と本文を作成してください。
 {{formatInstruction}}
@@ -222,6 +243,20 @@
       default_format_id: 'heading_bullet',
       recommended_lengths: ['100字程度', '200字程度', '400字程度'],
       summary_enabled: true,
+    },
+    {
+      id: 'announcement',
+      category: 'contact',
+      label: '住民向けお知らせ（掲示文）',
+      description:
+        '管理組合から居住者向けのお知らせ・掲示文の下書きを作成します。挨拶文を含み、記書き形式で出力します。',
+      btn_label_draft: 'Geminiでお知らせを作成',
+      btn_label_summary: 'Geminiで要約',
+      prompt_draft: ANNOUNCEMENT_PROMPT_DRAFT,
+      prompt_summary: GENERIC_SUMMARY_PROMPT,
+      default_format_id: 'notice_letter',
+      recommended_lengths: ['200字程度', '400字程度', '600字程度'],
+      summary_enabled: false,
     },
     {
       id: 'task',
