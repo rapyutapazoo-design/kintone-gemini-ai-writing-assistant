@@ -1,5 +1,5 @@
 {
-  "name": "opinion-mail-sender-plugin",
+  "name": "ai-writing-assistant-plugin",
   "version": "0.1.0",
   "scripts": {
     "build": "kintone-plugin-packer --ppk private.ppk --out dist/plugin.zip src",
