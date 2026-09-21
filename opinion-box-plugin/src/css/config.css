@@ -212,3 +212,51 @@
 .obp-banner-warn button {
   margin-left: 8px;
 }
+
+.obp-api-key-status {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.obp-api-key-status-saved {
+  color: #0b8043;
+}
+
+.obp-api-key-status-empty {
+  color: #888;
+}
+
+.obp-example {
+  margin: 6px 0 10px;
+}
+
+.obp-example-summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #3498db;
+}
+
+.obp-example-body-wrap {
+  margin-top: 6px;
+  padding: 10px;
+  background: #f7f9fa;
+  border: 1px solid #e3e7e8;
+  border-radius: 3px;
+}
+
+.obp-example-label {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.obp-example-label:not(:first-child) {
+  margin-top: 8px;
+}
+
+.obp-example-text {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 13px;
+  line-height: 1.7;
+}

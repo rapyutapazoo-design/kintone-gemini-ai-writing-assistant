@@ -10,18 +10,20 @@
         <div class="kintoneplugin-label">Gemini APIキー<span class="kintoneplugin-require">*</span></div>
         <div class="kintoneplugin-desc">
           Google AI Studio等で取得したAPIキーを入力してください。<br>
-          <span style="color:red; font-size:12px;">※ セキュリティ仕様上、保存済みのAPIキーは読み出せません。設定を保存するたびにAPIキーの再入力が必要です。</span>
+          一度保存したAPIキーはkintoneに保持されます。変更しない場合は空欄のまま保存してください。セキュリティのため保存済みのキーは画面に表示しません（キーを変更するときだけ新しいキーを入力してください）。
         </div>
         <div class="kintoneplugin-input-outer">
-          <input type="password" id="obp-api-key" class="kintoneplugin-input-text" placeholder="APIキーを入力">
+          <input type="password" id="obp-api-key" class="kintoneplugin-input-text" placeholder="変更する場合のみ入力">
           <button type="button" id="obp-api-key-toggle">表示</button>
         </div>
+        <p id="obp-api-key-status" class="obp-api-key-status"></p>
       </div>
 
       <div class="kintoneplugin-row">
         <div class="kintoneplugin-label">Geminiモデル<span class="kintoneplugin-require">*</span></div>
         <div class="kintoneplugin-desc">
-          APIキーを入力すると、利用可能なモデルの一覧を自動取得します。モデルを選択すると自動で実疎通確認（実際にAPIを呼び出して利用可否を確認）します。
+          保存済みのAPIキー（またはこの画面で入力したAPIキー）を使って、利用可能なモデルの一覧を自動取得します。既定では文章生成に適した推奨モデルのみを表示します。モデルを選択すると自動で疎通確認を行います。疎通確認はモデル情報の取得のみで行い、文章生成は行いません（課金されません）。<br>
+          kintoneには外部APIの応答時間に制限があるため、高速なモデルを推奨します。一覧の「高速／標準／低速」はモデル名から推定した<strong>目安（推定）</strong>です。
         </div>
         <div class="kintoneplugin-input-outer">
           <select id="obp-model-select" class="kintoneplugin-select"></select>
@@ -30,10 +32,16 @@
         </div>
         <div class="kintoneplugin-input-outer">
           <label>
+            <input type="checkbox" id="obp-model-show-all">
+            すべてのモデルを表示する（音声合成・文字起こし等、文章生成に適さないモデルも含む）
+          </label>
+        </div>
+        <div class="kintoneplugin-input-outer">
+          <label>
             <input type="checkbox" id="obp-model-manual-check">
             一覧にないモデル名を手入力する
           </label>
-          <input type="text" id="obp-model-manual" disabled style="display:none" placeholder="例: gemini-2.5-flash">
+          <input type="text" id="obp-model-manual" disabled style="display:none" placeholder="例: gemini-flash-lite-latest">
         </div>
       </div>
     </div>
@@ -52,6 +60,15 @@
           <button type="button" id="obp-preset-apply">この文面を適用</button>
         </div>
         <p id="obp-preset-description" class="obp-preset-description"></p>
+        <details class="obp-example">
+          <summary class="obp-example-summary">この用途の出力例を見る</summary>
+          <div class="obp-example-body-wrap">
+            <div class="obp-example-label">件名</div>
+            <div id="obp-preset-example-subject" class="obp-example-text"></div>
+            <div class="obp-example-label">本文</div>
+            <div id="obp-preset-example-body" class="obp-example-text"></div>
+          </div>
+        </details>
         <p id="obp-preset-current" class="obp-preset-current"></p>
       </div>
     </div>
@@ -228,6 +245,12 @@
         <div class="kintoneplugin-input-outer">
           <select id="obp-format-select" class="kintoneplugin-select"></select>
         </div>
+        <details class="obp-example">
+          <summary class="obp-example-summary">この形式の出力例を見る</summary>
+          <div class="obp-example-body-wrap">
+            <div id="obp-format-example" class="obp-example-text"></div>
+          </div>
+        </details>
       </div>
 
       <div class="kintoneplugin-row">

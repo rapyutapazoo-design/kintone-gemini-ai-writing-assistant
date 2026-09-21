@@ -6,16 +6,37 @@
     'https://generativelanguage.googleapis.com/v1beta/models/';
   const PROXY_GET_PREFIX =
     'https://generativelanguage.googleapis.com/v1beta/models';
-  const DEFAULT_MODEL = 'gemini-2.5-flash';
+  // 特定バージョンをハードコードすると提供終了時に既存アプリが復旧できなくなる
+  // ため、必ず「-latest」エイリアスを既定値にすること。
+  // kintone プロキシのサーバー側タイムアウトに収まりやすい Flash-Lite を
+  // 既定にする（実機検証済み）。安易に Flash へ戻さないこと。
+  const DEFAULT_MODEL = 'gemini-flash-lite-latest';
   const FALLBACK_MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-3.5-flash',
+    'gemini-flash-lite-latest',
+    'gemini-flash-latest',
+    'gemini-pro-latest',
   ];
   const LIST_TIMEOUT_MS = 15000;
   const TEST_TIMEOUT_MS = 15000;
-  const PROXY_TIMEOUT_MS = 20000;
+  // kintone サーバー側のタイムアウトの方が短いことが実測で判明しているため、
+  // この値は保険にすぎず、40000（40秒）は推定値である。
+  const PROXY_TIMEOUT_MS = 40000;
   const MAX_LIST_PAGES = 5;
+  const EXCLUDED_MODEL_PATTERNS = [
+    'tts',
+    'transcribe',
+    'computer-use',
+    'deep-research',
+    'antigravity',
+    'image',
+    'embedding',
+    'aqa',
+    'imagen',
+    'veo',
+  ];
+  const RETRY_STATUSES = [429, 500, 503];
+  const RETRY_MAX_ATTEMPTS = 3;
+  const RETRY_BASE_DELAY_MS = 1000;
 
   function stripModelPrefix(name) {
     const str = String(name || '');
@@ -43,6 +64,32 @@
     } catch {
       return null;
     }
+  }
+
+  // エラー本文から詳細文字列を組み立てる。Gemini形式（error.message）を
+  // 優先し、無ければ kintone形式（トップレベルの code/message）を使う。
+  // 返り値の kintoneCode は呼び出し元での分岐用で、classifyError が返す
+  // code（自前の分類コード）を上書きする用途ではない。
+  function parseErrorBody(bodyJson) {
+    if (!bodyJson) {
+      return { detail: '', kintoneCode: '' };
+    }
+    if (bodyJson.error && bodyJson.error.message) {
+      return {
+        detail: String(bodyJson.error.message).slice(0, 200),
+        kintoneCode: '',
+      };
+    }
+    const kintoneCode = bodyJson.code ? String(bodyJson.code) : '';
+    const kintoneMessage = bodyJson.message ? String(bodyJson.message) : '';
+    if (!kintoneCode && !kintoneMessage) {
+      return { detail: '', kintoneCode: '' };
+    }
+    const joined =
+      kintoneCode && kintoneMessage
+        ? kintoneCode + ': ' + kintoneMessage
+        : kintoneCode || kintoneMessage;
+    return { detail: joined.slice(0, 200), kintoneCode: kintoneCode };
   }
 
   function classifyError(status, bodyJson) {
@@ -89,9 +136,18 @@
       message = '不明なエラー（ステータス: ' + status + '）';
     }
 
-    if (bodyJson && bodyJson.error && bodyJson.error.message) {
-      const detail = String(bodyJson.error.message).slice(0, 200);
-      message = message + '（詳細: ' + detail + '）';
+    const parsed = parseErrorBody(bodyJson);
+
+    if (parsed.kintoneCode.indexOf('GAIA_') === 0) {
+      // kintone自身が返したエラー（GAIA_*）は、Gemini のリクエスト内容が
+      // 不正だったわけではない。汎用の400メッセージ（「APIキーの形式が
+      // 不正です」）をそのまま添えると、上位で正しい案内を出しても末尾で
+      // 再びAPIキーを疑わせてしまうため、基底メッセージを差し替える。
+      level = 'warn';
+      message = 'kintone側で外部APIの実行に失敗しました';
+    }
+    if (parsed.detail) {
+      message = message + '（詳細: ' + parsed.detail + '）';
     }
 
     return { level: level, code: code, message: message, status: status };
@@ -142,19 +198,73 @@
       }
     }
 
-    const filtered = models
+    return normalizeModelList(models);
+  }
+
+  function isExcludedModel(bareName) {
+    const lower = String(bareName).toLowerCase();
+    return EXCLUDED_MODEL_PATTERNS.some((p) => lower.indexOf(p) !== -1);
+  }
+
+  function isRecommendedModel(bareName) {
+    const lower = String(bareName).toLowerCase();
+    return (
+      !isExcludedModel(bareName) &&
+      lower.indexOf('gemini-') === 0 &&
+      lower.indexOf('-preview') === -1 &&
+      (lower.indexOf('flash') !== -1 || lower.indexOf('pro') !== -1)
+    );
+  }
+
+  // モデル名から速度の目安（あくまで推定）を判定する。
+  // 判定順は lite → pro → その他（gemini-flash-lite-latest を誤って
+  // slow にしないため）。
+  function getModelSpeedClass(bareName) {
+    const lower = String(bareName).toLowerCase();
+    if (lower.indexOf('lite') !== -1) {
+      return 'fast';
+    }
+    if (lower.indexOf('pro') !== -1) {
+      return 'slow';
+    }
+    return 'normal';
+  }
+
+  function getModelSpeedLabel(bareName) {
+    const speedClass = getModelSpeedClass(bareName);
+    if (speedClass === 'fast') {
+      return '（高速・推奨）';
+    }
+    if (speedClass === 'slow') {
+      return '（低速・kintoneの制限を超える場合あり）';
+    }
+    return '（標準）';
+  }
+
+  function normalizeModelList(rawModels) {
+    const filtered = (Array.isArray(rawModels) ? rawModels : [])
       .filter(
         (m) =>
           Array.isArray(m.supportedGenerationMethods) &&
           m.supportedGenerationMethods.indexOf('generateContent') !== -1,
       )
-      .map((m) => ({
-        name: m.name,
-        displayName: m.displayName || stripModelPrefix(m.name),
-        description: m.description || '',
-      }));
+      .map((m) => {
+        const bare = stripModelPrefix(m.name);
+        return {
+          name: m.name,
+          displayName: m.displayName || bare,
+          description: m.description || '',
+          excluded: isExcludedModel(bare),
+          recommended: isRecommendedModel(bare),
+        };
+      });
 
-    filtered.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    filtered.sort((a, b) => {
+      if (a.recommended !== b.recommended) {
+        return a.recommended ? -1 : 1;
+      }
+      return a.displayName.localeCompare(b.displayName);
+    });
 
     const defaultIndex = filtered.findIndex(
       (m) => normalizeModelName(m.name) === normalizeModelName(DEFAULT_MODEL),
@@ -167,26 +277,14 @@
     return filtered;
   }
 
-  async function testModelDirect(apiKey, modelName) {
-    const url =
-      API_BASE + '/' + normalizeModelName(modelName) + ':generateContent';
-    const data = {
-      contents: [{ parts: [{ text: 'OK' }] }],
-      generationConfig: { maxOutputTokens: 16, temperature: 0 },
-    };
+  async function checkModelAvailability(apiKey, modelName) {
+    const url = API_BASE + '/' + normalizeModelName(modelName);
 
     let res;
     try {
       res = await fetchWithTimeout(
         url,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: JSON.stringify(data),
-        },
+        { method: 'GET', headers: { 'x-goog-api-key': apiKey } },
         TEST_TIMEOUT_MS,
       );
     } catch (e) {
@@ -196,9 +294,46 @@
 
     const text = await res.text();
     const json = safeParseJson(text);
+
+    if (res.status === 200) {
+      const supported =
+        json &&
+        Array.isArray(json.supportedGenerationMethods) &&
+        json.supportedGenerationMethods.indexOf('generateContent') !== -1;
+      if (!supported) {
+        return {
+          level: 'ng',
+          code: 'UNSUPPORTED_METHOD',
+          message: 'このモデルは文章生成（generateContent）に対応していません',
+          status: 200,
+        };
+      }
+      return classifyError(200, json);
+    }
+
     return classifyError(res.status, json);
   }
 
+  function normalizeProxyBody(body) {
+    if (body === null || body === undefined || typeof body === 'string') {
+      return body;
+    }
+    if (typeof body === 'object') {
+      try {
+        return JSON.stringify(body);
+      } catch {
+        return String(body);
+      }
+    }
+    return String(body);
+  }
+
+  // 重要: kintone.plugin.app.proxy() はレコード一覧/詳細/追加/編集/印刷とグラフ画面
+  // でのみ利用できる。プラグイン設定画面で呼ぶと成功・失敗どちらのコールバックも
+  // 呼ばれないため、下の PROXY_TIMEOUT_MS のタイマーだけが発火して status:0
+  // （タイムアウト）になる。設定画面からは絶対にこの関数を使わないこと。
+  // 設定画面での疎通確認・モデル一覧取得は直接通信（checkModelAvailability /
+  // listGenerateContentModels）を使う。
   function proxyRequest(pluginId, url, method, headers, data) {
     return new Promise((resolve, reject) => {
       let done = false;
@@ -210,50 +345,116 @@
         resolve({ status: 0, body: null });
       }, PROXY_TIMEOUT_MS);
 
-      kintone.plugin.app.proxy(
-        pluginId,
-        url,
-        method,
-        headers,
-        data,
-        (body, status) => {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          resolve({ status: status, body: body });
-        },
-        (err) => {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          reject(
-            new Error('kintone proxy でエラーが発生しました。詳細: ' + err),
-          );
-        },
-      );
+      function finishResolve(result) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(result);
+      }
+
+      function finishReject(err) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        reject(err);
+      }
+
+      // Promise 形式・コールバック形式のどちらの kintone SDK でも動くよう、
+      // コールバックは常に登録したうえで戻り値の then の有無で判定する
+      // （二段構え）。呼び出し自体が同期的に例外を投げる環境に備え、
+      // try/catch で確実にフォールバック経路（自前タイマー）へ落とす。
+      let ret;
+      try {
+        ret = kintone.plugin.app.proxy(
+          pluginId,
+          url,
+          method,
+          headers,
+          data,
+          (body, status) => {
+            // コールバック形式（旧 kintone SDK）。
+            finishResolve({ status: status, body: normalizeProxyBody(body) });
+          },
+          (err) => {
+            finishReject(
+              new Error('kintone proxy でエラーが発生しました。詳細: ' + err),
+            );
+          },
+        );
+      } catch {
+        // 同期例外時は何もせず、自前タイマー（status:0）に処理を委ねる。
+        return;
+      }
+
+      if (ret && typeof ret.then === 'function') {
+        // Promise 形式（新しい kintone SDK）。resolve 値は [body, status,
+        // headers] のタプル。
+        ret.then(
+          (arr) => {
+            const body = Array.isArray(arr) ? arr[0] : undefined;
+            const status = Array.isArray(arr) ? arr[1] : undefined;
+            finishResolve({ status: status, body: normalizeProxyBody(body) });
+          },
+          (rejectValue) => {
+            // kintone側のエラー本文（GAIA_PR03等）を呼び出し元（classifyError）
+            // まで確実に届けることを最優先にする。status は不明なため 400 と
+            // みなし、classifyError 側で kintone 形式の code/message から
+            // 詳細文字列を組み立てられるようにする。
+            let body;
+            let status = 400;
+            if (Array.isArray(rejectValue)) {
+              body = rejectValue[0];
+              if (typeof rejectValue[1] === 'number') {
+                status = rejectValue[1];
+              }
+            } else if (rejectValue instanceof Error) {
+              body = rejectValue.message;
+            } else {
+              body = rejectValue;
+            }
+            finishResolve({ status: status, body: normalizeProxyBody(body) });
+          },
+        );
+      }
+      // Promise が返らない環境では、上で登録済みのコールバック形式が
+      // そのままフォールバックとして機能する。
     });
   }
 
-  async function testModelViaProxy(pluginId, modelName) {
-    const url =
-      PROXY_POST_PREFIX + stripModelPrefix(modelName) + ':generateContent';
-    const data = {
-      contents: [{ parts: [{ text: 'OK' }] }],
-      generationConfig: { maxOutputTokens: 16, temperature: 0 },
-    };
+  function delayWithJitter(attempt) {
+    const base = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+    const wait = Math.round(base * (0.5 + Math.random() * 0.5));
+    return new Promise((resolve) => setTimeout(resolve, wait));
+  }
 
-    try {
-      const result = await proxyRequest(
-        pluginId,
-        url,
-        'POST',
-        { 'Content-Type': 'application/json' },
-        data,
-      );
-      return classifyError(result.status, safeParseJson(result.body));
-    } catch {
-      return classifyError(-1, null);
+  // 429/500/503 のみ指数バックオフ・リトライ（最大3回）する。400/401/403/404、
+  // および status:0（タイムアウト。PROXY_TIMEOUT_MS が40秒のため再試行すると
+  // 最悪3分弱になる）は絶対にリトライしない。proxyRequest が reject した場合
+  // （proxy 呼び出し自体のエラー）も再試行せずそのまま例外を伝播する。
+  async function proxyRequestWithRetry(
+    pluginId,
+    url,
+    method,
+    headers,
+    data,
+    onRetry,
+  ) {
+    for (let attempt = 0; attempt <= RETRY_MAX_ATTEMPTS; attempt++) {
+      const res = await proxyRequest(pluginId, url, method, headers, data);
+      const shouldRetry =
+        attempt < RETRY_MAX_ATTEMPTS &&
+        RETRY_STATUSES.indexOf(res.status) !== -1;
+      if (!shouldRetry) {
+        return res;
+      }
+      if (typeof onRetry === 'function') {
+        onRetry(attempt + 1, RETRY_MAX_ATTEMPTS + 1, res.status);
+      }
+      await delayWithJitter(attempt);
     }
+    // ループ内で attempt === RETRY_MAX_ATTEMPTS のとき必ず return するため、
+    // ここには到達しない。
+    throw new Error('proxyRequestWithRetry: unreachable');
   }
 
   function extractText(data) {
@@ -375,15 +576,21 @@
     TEST_TIMEOUT_MS: TEST_TIMEOUT_MS,
     PROXY_TIMEOUT_MS: PROXY_TIMEOUT_MS,
     MAX_LIST_PAGES: MAX_LIST_PAGES,
+    RETRY_MAX_ATTEMPTS: RETRY_MAX_ATTEMPTS,
     normalizeModelName: normalizeModelName,
     stripModelPrefix: stripModelPrefix,
     fetchWithTimeout: fetchWithTimeout,
     safeParseJson: safeParseJson,
     classifyError: classifyError,
     listGenerateContentModels: listGenerateContentModels,
-    testModelDirect: testModelDirect,
+    normalizeModelList: normalizeModelList,
+    isExcludedModel: isExcludedModel,
+    isRecommendedModel: isRecommendedModel,
+    getModelSpeedClass: getModelSpeedClass,
+    getModelSpeedLabel: getModelSpeedLabel,
+    checkModelAvailability: checkModelAvailability,
     proxyRequest: proxyRequest,
-    testModelViaProxy: testModelViaProxy,
+    proxyRequestWithRetry: proxyRequestWithRetry,
     extractText: extractText,
     tryParseJsonPayload: tryParseJsonPayload,
     escapeHtml: escapeHtml,

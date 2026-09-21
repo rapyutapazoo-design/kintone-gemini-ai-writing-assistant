@@ -32,7 +32,7 @@
 【本文】
 {{body}}`;
 
-  const GEMINI_MODEL = config.gemini_model || 'gemini-2.5-flash';
+  const GEMINI_MODEL = config.gemini_model || client.DEFAULT_MODEL;
   const F_INPUT = config.field_input || 'keyword_input';
   const F_LENGTH =
     config.field_length === undefined ? 'length_option' : config.field_length;
@@ -479,22 +479,7 @@
       renderRestoreButton(currentRecord.record, isMobile, appManager);
     } catch (error) {
       console.error(error);
-      if (
-        (error.classified && error.classified.code === 'NOT_FOUND') ||
-        /404/.test(error.message)
-      ) {
-        alert(
-          '生成に失敗しました。選択中のモデル（' +
-            GEMINI_MODEL +
-            '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
-            error.message,
-        );
-      } else {
-        alert(
-          '生成に失敗しました。\nAPIキーが設定されているか確認してください。\n' +
-            error.message,
-        );
-      }
+      alert(buildApiErrorMessage('生成', error));
     } finally {
       hideSpinner();
     }
@@ -528,25 +513,69 @@
       location.reload();
     } catch (error) {
       console.error(error);
-      if (
-        (error.classified && error.classified.code === 'NOT_FOUND') ||
-        /404/.test(error.message)
-      ) {
-        alert(
-          '要約に失敗しました。選択中のモデル（' +
-            GEMINI_MODEL +
-            '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
-            error.message,
-        );
-      } else {
-        alert(
-          '要約に失敗しました。\nAPIキーが設定されているか確認してください。\n' +
-            error.message,
-        );
-      }
+      alert(buildApiErrorMessage('要約', error));
     } finally {
       hideSpinner();
     }
+  }
+
+  // API失敗時のalertメッセージを組み立てる。
+  // 503/500/429（Gemini側の一時的な混雑・レート上限）、status:0（無応答）、
+  // GAIA_PR03（kintoneプロキシのタイムアウト）、status:-1（通信エラー）では
+  // 「APIキーが設定されているか確認してください」という誤誘導を出さない。
+  function buildApiErrorMessage(prefix, error) {
+    const isNotFound =
+      (error.classified && error.classified.code === 'NOT_FOUND') ||
+      /404/.test(error.message);
+    if (isNotFound) {
+      return (
+        prefix +
+        'に失敗しました。選択中のモデル（' +
+        GEMINI_MODEL +
+        '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
+        error.message
+      );
+    }
+
+    const status = error.classified && error.classified.status;
+
+    const haystack = (
+      String(error.responseBody || '') +
+      ' ' +
+      String(error.message || '') +
+      ' ' +
+      String((error.classified && error.classified.message) || '')
+    ).toLowerCase();
+    const isGaiaTimeout = status === 0 || haystack.indexOf('gaia_pr03') !== -1;
+    if (isGaiaTimeout) {
+      return (
+        prefix +
+        'に失敗しました。\nGeminiの応答がkintoneの制限時間内に返りませんでした。混雑している可能性があります。\n少し時間をおいて再実行するか、プラグイン設定で「高速」と表示されたモデルをお試しください。\n' +
+        error.message
+      );
+    }
+
+    if (status === -1) {
+      return (
+        prefix +
+        'に失敗しました。\nネットワークまたはブラウザ側の制限により通信できませんでした。通信環境をご確認のうえ、再度お試しください。\n' +
+        error.message
+      );
+    }
+
+    if (status === 503 || status === 500 || status === 429) {
+      return (
+        prefix +
+        'に失敗しました。\nGemini側が一時的に混雑しています。数分おいて再度お試しください。\n（自動で再試行しましたが復旧しませんでした）\n' +
+        error.message
+      );
+    }
+
+    return (
+      prefix +
+      'に失敗しました。\nAPIキーが設定されているか確認してください。\n' +
+      error.message
+    );
   }
 
   function callGeminiAPI(prompt, requireJson = true) {
@@ -565,12 +594,16 @@
 
     // headerのx-goog-api-keyはプロキシ設定側で自動的に付与されます
     return client
-      .proxyRequest(
+      .proxyRequestWithRetry(
         PLUGIN_ID,
         url,
         'POST',
         { 'Content-Type': 'application/json' },
         data,
+        (attempt, total) =>
+          setSpinnerText(
+            '混雑のため再試行しています…（' + attempt + '/' + total + '）',
+          ),
       )
       .then(({ status, body }) => {
         if (status >= 200 && status < 300) {
@@ -589,6 +622,7 @@
         const c = client.classifyError(status, client.safeParseJson(body));
         const err = new Error('API Error ' + status + ': ' + c.message);
         err.classified = c;
+        err.responseBody = String(body == null ? '' : body);
         throw err;
       });
   }
@@ -866,6 +900,7 @@
     container.appendChild(ring);
     container.appendChild(star);
     const text = document.createElement('div');
+    text.id = 'kintone-spinner-text';
     text.className = 'spinner-text';
     text.innerText = 'Geminiが思考中です...';
     overlay.appendChild(container);
@@ -879,6 +914,15 @@
       overlay.style.opacity = '0';
       overlay.style.transition = 'opacity 0.5s';
       setTimeout(() => overlay.remove(), 500);
+    }
+  }
+
+  // リトライ中の待機理由をスピナーに表示する。スピナー非表示中や要素が
+  // 見つからない場合は何もしない（防御的実装）。
+  function setSpinnerText(text) {
+    const el = document.getElementById('kintone-spinner-text');
+    if (el) {
+      el.innerText = text;
     }
   }
 })(kintone.$PLUGIN_ID);

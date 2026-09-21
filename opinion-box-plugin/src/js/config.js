@@ -11,7 +11,7 @@
   );
 
   const DEFAULTS = {
-    gemini_model: 'gemini-2.5-flash',
+    gemini_model: 'gemini-flash-lite-latest',
     field_input: 'keyword_input',
     field_length: 'length_option',
     field_subject: 'opinion_subject',
@@ -60,6 +60,16 @@
   let fieldMetaCache = {};
   let currentLengthRows = genOpts.parseMap(config.length_map, []);
   let appliedPresetId = config.preset_id || '';
+  let savedApiKeyExists = false;
+  let savedApiKeyMasked = '';
+  // 保存済みAPIキーの実値。設定画面では kintone.plugin.app.proxy() が使えないため、
+  // モデル一覧取得・疎通確認は直接通信でこの値を使う。
+  // DOM（入力欄・メッセージ）へは絶対に書き出さないこと。
+  let savedApiKeyValue = '';
+  // 直近に取得したモデル一覧（excluded/recommended フラグ付き）。
+  // 「すべてのモデルを表示する」チェックボックスの切り替え時、API再取得なしで
+  // 表示を切り替えるために保持する。
+  let allFetchedModels = [];
 
   function showMessage(type, text) {
     const el = document.getElementById('obp-message');
@@ -601,6 +611,20 @@
     const formatId = matchedFormat ? matchedFormat.id : 'custom';
     document.getElementById('obp-format-select').value = formatId;
     document.getElementById('obp-format-instruction').value = instruction;
+    renderFormatExample(formatId);
+  }
+
+  function renderFormatExample(formatId) {
+    const el = document.getElementById('obp-format-example');
+    if (!el) {
+      return;
+    }
+    const f = genOpts.getFormatOption(formatId);
+    if (formatId === 'custom' || !f || !f.example) {
+      el.textContent = '独自の指示のため、出力例はありません。';
+      return;
+    }
+    el.textContent = f.example;
   }
 
   // =========================================================
@@ -639,6 +663,24 @@
     document.getElementById('obp-preset-description').textContent = preset
       ? preset.description
       : '';
+    renderPresetExample();
+  }
+
+  function renderPresetExample() {
+    const id = document.getElementById('obp-preset-select').value;
+    const preset = presets.getPreset(id);
+    const subjectEl = document.getElementById('obp-preset-example-subject');
+    const bodyEl = document.getElementById('obp-preset-example-body');
+    if (!subjectEl || !bodyEl) {
+      return;
+    }
+    if (preset && preset.example_output) {
+      subjectEl.textContent = preset.example_output.subject || '';
+      bodyEl.textContent = preset.example_output.body || '';
+    } else {
+      subjectEl.textContent = 'この用途の出力例は登録されていません。';
+      bodyEl.textContent = 'この用途の出力例は登録されていません。';
+    }
   }
 
   function updatePresetCurrentLabel() {
@@ -682,6 +724,7 @@
     document.getElementById('obp-format-instruction').value = f
       ? f.instruction
       : '';
+    renderFormatExample(preset.default_format_id);
 
     const summaryOn = !!preset.summary_enabled;
     document.getElementById('obp-summary-enabled').checked = summaryOn;
@@ -755,6 +798,21 @@
     return false;
   }
 
+  // 「すべてのモデルを表示する」の状態に応じて、select に流し込むモデル一覧を
+  // 決定する。allFetchedModels 未取得時は FALLBACK_MODELS（文字列配列）を返す。
+  function getVisibleModels() {
+    const showAllEl = document.getElementById('obp-model-show-all');
+    const showAll = !!showAllEl && showAllEl.checked;
+    if (!allFetchedModels.length) {
+      return client.FALLBACK_MODELS;
+    }
+    if (showAll) {
+      return allFetchedModels;
+    }
+    const recommended = allFetchedModels.filter((m) => m.recommended);
+    return recommended.length > 0 ? recommended : allFetchedModels;
+  }
+
   function buildModelOptions(models) {
     const select = document.getElementById('obp-model-select');
     select.innerHTML = '';
@@ -767,7 +825,12 @@
         : m.displayName || client.stripModelPrefix(m.name);
       const option = document.createElement('option');
       option.value = bareName;
-      option.textContent = displayName + '（' + bareName + '）';
+      option.textContent =
+        displayName +
+        '（' +
+        bareName +
+        '）' +
+        client.getModelSpeedLabel(bareName);
       select.appendChild(option);
     });
   }
@@ -808,8 +871,7 @@
   }
 
   async function refreshModelList() {
-    const apiKeyEl = document.getElementById('obp-api-key');
-    const apiKey = apiKeyEl.value;
+    const apiKey = getEffectiveApiKey();
     const refreshBtn = document.getElementById('obp-model-refresh');
 
     if (!apiKey) {
@@ -826,10 +888,13 @@
 
     try {
       const models = await client.listGenerateContentModels(apiKey);
-      buildModelOptions(models);
+      allFetchedModels = models;
+      buildModelOptions(getVisibleModels());
       applySelection(preferred);
+      checkSavedModelAvailability();
     } catch (e) {
       const msg = (e.classified && e.classified.message) || e.message;
+      allFetchedModels = [];
       buildModelOptions(client.FALLBACK_MODELS);
       applySelection(preferred);
       showMessage(
@@ -844,9 +909,28 @@
     return validateSelectedModel();
   }
 
+  // 保存済みモデル（config.gemini_model）が今回取得した一覧に無い場合、
+  // 選び直しを促す warn バナーを表示する。値の自動書き換えは行わない。
+  function checkSavedModelAvailability() {
+    const savedModel = config.gemini_model;
+    if (!savedModel) {
+      return;
+    }
+    const found = allFetchedModels.some(
+      (m) => client.stripModelPrefix(m.name) === savedModel,
+    );
+    if (!found) {
+      showMessage(
+        'warn',
+        '保存済みのモデル（' +
+          savedModel +
+          '）は現在のAPIキーでは利用できません。モデルを選び直して保存してください。',
+      );
+    }
+  }
+
   async function validateSelectedModel() {
-    const apiKeyEl = document.getElementById('obp-api-key');
-    const apiKey = apiKeyEl.value;
+    const apiKey = getEffectiveApiKey();
     const modelName = getSelectedModelName();
 
     if (!apiKey || !modelName) {
@@ -858,40 +942,26 @@
     const seq = ++validationSeq;
     setStatus('loading', '確認中…');
 
-    let result = await client.testModelDirect(apiKey, modelName);
+    // 設定画面では kintone.plugin.app.proxy() が使えないため、疎通確認は
+    // 必ずブラウザからの直接通信で行う。疎通確認はモデル情報の GET 取得
+    // （generateContent は行わない）のみで判定する。
+    const result = await client.checkModelAvailability(apiKey, modelName);
 
     if (seq !== validationSeq) {
       return null;
     }
 
-    const applyStatus = (r) => {
-      if (r.level === 'ok') {
-        setStatus('ok', '✓ 利用可能');
-      } else if (r.level === 'ng') {
-        setStatus('ng', '✗ 利用不可: ' + r.message);
-      } else {
-        setStatus('warn', '△ 確認できませんでした: ' + r.message);
-      }
-    };
-
-    applyStatus(result);
-
-    if (result.level === 'warn' && result.status === -1) {
-      const proceed = confirm(
-        'ブラウザからGeminiへ直接通信できませんでした。APIキーをkintoneに先に保存してから、kintone経由で確認しますか？（APIキーが保存されます）',
+    if (result.level === 'ok') {
+      setStatus('ok', '✓ 利用可能（モデル情報の取得に成功）');
+    } else if (result.level === 'ng') {
+      setStatus('ng', '✗ 利用不可: ' + result.message);
+    } else if (result.status === -1) {
+      setStatus(
+        'warn',
+        '△ 設定画面からは疎通確認できませんでした（ブラウザから直接通信できない環境の可能性があります）。保存後にレコード画面で動作をご確認ください。',
       );
-      if (proceed) {
-        try {
-          await saveProxyConfig(apiKey);
-          result = await client.testModelViaProxy(PLUGIN_ID, modelName);
-        } catch {
-          result = client.classifyError(-1, null);
-        }
-        if (seq !== validationSeq) {
-          return null;
-        }
-        applyStatus(result);
-      }
+    } else {
+      setStatus('warn', '△ 確認できませんでした: ' + result.message);
     }
 
     lastValidation = {
@@ -900,6 +970,64 @@
       message: result.message,
     };
     return lastValidation;
+  }
+
+  // =========================================================
+  // 保存済みAPIキーの読み出し。
+  // 実値は設定画面での直接通信（モデル一覧取得・疎通確認）にのみ使い、
+  // 画面には末尾4桁のマスクだけを表示する。入力欄には書き戻さない。
+  // =========================================================
+  function maskApiKey(value) {
+    const str = String(value || '');
+    return str ? '••••••••' + str.slice(-4) : '';
+  }
+
+  function getSavedApiKeyInfo() {
+    if (typeof kintone.plugin.app.getProxyConfig !== 'function') {
+      return { saved: false, masked: '', value: '' };
+    }
+    try {
+      const proxyConfig = kintone.plugin.app.getProxyConfig(
+        client.PROXY_POST_PREFIX,
+        'POST',
+      );
+      const headerValue =
+        proxyConfig &&
+        proxyConfig.headers &&
+        proxyConfig.headers['x-goog-api-key'];
+      if (!headerValue) {
+        return { saved: false, masked: '', value: '' };
+      }
+      return {
+        saved: true,
+        masked: maskApiKey(headerValue),
+        value: String(headerValue),
+      };
+    } catch {
+      return { saved: false, masked: '', value: '' };
+    }
+  }
+
+  // 入力欄の値を優先し、未入力なら保存済みの実値を使う（直接通信用）
+  function getEffectiveApiKey() {
+    return document.getElementById('obp-api-key').value || savedApiKeyValue;
+  }
+
+  function updateApiKeyStatusLabel() {
+    const el = document.getElementById('obp-api-key-status');
+    if (!el) {
+      return;
+    }
+    if (savedApiKeyExists) {
+      el.textContent =
+        '✓ APIキーは設定済みです' +
+        (savedApiKeyMasked ? '（' + savedApiKeyMasked + '）' : '') +
+        '。変更しない場合は空欄のまま保存してください。';
+      el.className = 'obp-api-key-status obp-api-key-status-saved';
+    } else {
+      el.textContent = 'APIキーは未設定です。初回は入力が必要です。';
+      el.className = 'obp-api-key-status obp-api-key-status-empty';
+    }
   }
 
   function saveProxyConfig(apiKey) {
@@ -928,30 +1056,35 @@
     const apiKey = document.getElementById('obp-api-key').value;
     const modelName = getSelectedModelName();
 
-    showMessage(
-      'info',
-      '保存処理を実行しています…（kintoneプロキシ経由の確認を含むため、最大20秒程度かかる場合があります）',
-    );
+    showMessage('info', '保存処理を実行しています…');
 
-    try {
-      await saveProxyConfig(apiKey);
-    } catch (e) {
-      showMessage('error', 'プロキシ設定の保存に失敗しました。詳細: ' + e);
-      return;
-    }
-
-    let result = await client.testModelViaProxy(PLUGIN_ID, modelName);
-    if (result.level !== 'ok') {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      result = await client.testModelViaProxy(PLUGIN_ID, modelName);
-      if (result.level !== 'ok') {
-        showMessage(
-          'warn',
-          'kintoneプロキシ経由での疎通確認に失敗しました（' +
-            result.message +
-            '）。設定は保存しますが、実行画面で動作しない可能性があります。',
-        );
+    if (apiKey) {
+      try {
+        await saveProxyConfig(apiKey);
+      } catch (e) {
+        showMessage('error', 'プロキシ設定の保存に失敗しました。詳細: ' + e);
+        return;
       }
+      savedApiKeyExists = true;
+      savedApiKeyMasked = maskApiKey(apiKey);
+      savedApiKeyValue = apiKey;
+      updateApiKeyStatusLabel();
+    }
+    // apiKey が空文字のときは何もしない（既存のプロキシ設定をそのまま使う）
+
+    // 設定画面では kintone.plugin.app.proxy() が使えないため、保存時の確認も
+    // 直接通信で行う。直接通信できない環境では確認を諦めて保存を続行する。
+    const result = await client.checkModelAvailability(
+      getEffectiveApiKey(),
+      modelName,
+    );
+    if (result.level === 'ng') {
+      showMessage(
+        'warn',
+        '選択したモデルの疎通確認に失敗しました（' +
+          result.message +
+          '）。設定は保存しますが、レコード画面で動作しない可能性があります。',
+      );
     }
 
     checkPromptDraftWarnings();
@@ -1054,9 +1187,15 @@
       document.getElementById('obp-space-draft-text'),
     );
 
-    if (!apiKey || !modelName || !fieldInput || !fieldBody || !spaceDraft) {
+    if (
+      (!apiKey && !savedApiKeyValue) ||
+      !modelName ||
+      !fieldInput ||
+      !fieldBody ||
+      !spaceDraft
+    ) {
       alert(
-        '必須項目が未入力です。APIキー・モデル・「AIへの指示・メモ」フィールド・本文フィールド・下書きボタン設置スペースをすべて指定してください。',
+        '必須項目が未入力です。APIキー（初回のみ）・モデル・「AIへの指示・メモ」フィールド・本文フィールド・下書きボタン設置スペースをすべて指定してください。',
       );
       return;
     }
@@ -1167,6 +1306,7 @@
     const modelSelect = document.getElementById('obp-model-select');
     const modelManual = document.getElementById('obp-model-manual');
     const modelManualCheck = document.getElementById('obp-model-manual-check');
+    const modelShowAll = document.getElementById('obp-model-show-all');
     const summaryEnabledEl = document.getElementById('obp-summary-enabled');
     const summarySection = document.getElementById('obp-summary-section');
     const presetStructure = document.getElementById('obp-preset-structure');
@@ -1207,7 +1347,9 @@
 
     apiKeyEl.addEventListener('change', () => {
       lastValidation = null;
-      refreshModelList();
+      if (apiKeyEl.value || savedApiKeyValue) {
+        refreshModelList();
+      }
     });
 
     modelRefresh.addEventListener('click', () => {
@@ -1227,6 +1369,12 @@
     modelManualCheck.addEventListener('change', () => {
       toggleManualMode(modelManualCheck.checked);
       validateSelectedModel();
+    });
+
+    modelShowAll.addEventListener('change', () => {
+      const current = getSelectedModelName();
+      buildModelOptions(getVisibleModels());
+      applySelection(current);
     });
 
     summaryEnabledEl.addEventListener('change', () => {
@@ -1269,6 +1417,7 @@
       document.getElementById('obp-format-instruction').value = f
         ? f.instruction
         : '';
+      renderFormatExample(formatSelect.value);
     });
 
     promptDraft.addEventListener('input', () => {
@@ -1377,14 +1526,27 @@
     loadFields();
     loadSpaces();
 
+    // 実値はメモリ内でのみ保持する（入力欄やメッセージへは書き出さない）
+    const savedApiKeyInfo = getSavedApiKeyInfo();
+    savedApiKeyExists = savedApiKeyInfo.saved;
+    savedApiKeyMasked = savedApiKeyInfo.masked;
+    savedApiKeyValue = savedApiKeyInfo.value;
+    updateApiKeyStatusLabel();
+
     buildModelOptions(client.FALLBACK_MODELS);
     applySelection(config.gemini_model || DEFAULTS.gemini_model);
-    setStatus('loading', 'APIキーを入力するとモデル一覧を取得します');
 
-    showMessage(
-      'info',
-      '※ 保存済みのAPIキーは読み出せません。保存するたびにAPIキーの再入力が必要です。',
-    );
+    if (savedApiKeyValue) {
+      // 保存済みキーがあるので、開いた時点で最新のモデル一覧を取得する
+      setStatus('loading', 'モデル一覧を取得中…');
+      refreshModelList();
+    } else {
+      setStatus('loading', 'APIキーを入力するとモデル一覧を取得します');
+      showMessage(
+        'info',
+        'APIキーが未設定です。Google AI Studio等で取得したAPIキーを入力してください。',
+      );
+    }
   }
 
   init();

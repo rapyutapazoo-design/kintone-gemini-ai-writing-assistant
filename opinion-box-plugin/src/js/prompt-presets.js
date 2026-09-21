@@ -209,6 +209,16 @@
       label: '意見書',
       description:
         '住民・利用者からの意見書の下書きを作成します。挨拶文は禁止です。',
+      example_output: {
+        subject: '駐輪場増設のお願い',
+        body: `■現状
+現在の駐輪場は区画数が不足しており、〇〇号室の利用者から台数超過の相談が寄せられています。
+■要望
+・駐輪区画の増設を検討してください。
+・増設が難しい場合は、利用ルールの見直しをお願いします。
+■希望時期
+X月末までにご回答いただけますと幸いです。`,
+      },
       btn_label_draft: 'Geminiで件名・本文を作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: OPINION_PROMPT_DRAFT,
@@ -222,6 +232,16 @@
       category: 'contact',
       label: 'お問い合わせ',
       description: 'お問い合わせ内容の下書きを作成します。挨拶文は禁止です。',
+      example_output: {
+        subject: '共用部照明についての質問',
+        body: `■内容
+共用廊下の照明が一部点灯していないことに気づきました。
+■確認事項
+・修理の予定はありますか。
+・応急的な対応は可能でしょうか。
+■連絡希望
+X月X日までにご返信いただけますと助かります。`,
+      },
       btn_label_draft: 'Geminiで下書きを作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: CONTACT_PROMPT_DRAFT,
@@ -236,6 +256,16 @@
       label: '業務連絡・お知らせ',
       description:
         '管理組合内向けの業務連絡・お知らせの下書きを作成します。挨拶文は禁止です。',
+      example_output: {
+        subject: 'エレベーター点検のお知らせ',
+        body: `■点検日程
+X月X日（火）に共用エレベーターの定期点検を実施します。
+■注意事項
+・点検中はエレベーターをご利用いただけません。
+・階段のご利用にご協力ください。
+■問い合わせ先
+ご不明な点は管理組合事務局までご連絡ください。`,
+      },
       btn_label_draft: 'Geminiで下書きを作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: NOTICE_PROMPT_DRAFT,
@@ -250,6 +280,24 @@
       label: '住民向けお知らせ（掲示文）',
       description:
         '管理組合から居住者向けのお知らせ・掲示文の下書きを作成します。挨拶文を含み、記書き形式で出力します。',
+      example_output: {
+        subject: '共用部清掃実施のお知らせ',
+        body: `X月X日
+居住者各位
+管理組合
+
+日頃より管理組合の運営にご協力いただき、誠にありがとうございます。
+下記のとおり共用部の清掃作業を実施いたしますので、お知らせいたします。
+
+記
+・実施日: X月X日（土）
+・時間: 午前9時から正午まで
+・対象箇所: エントランス、廊下、駐輪場
+
+作業中はご不便をおかけしますが、ご理解のほどよろしくお願いいたします。
+
+以上`,
+      },
       btn_label_draft: 'Geminiでお知らせを作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: ANNOUNCEMENT_PROMPT_DRAFT,
@@ -264,6 +312,12 @@
       label: 'タスク説明文',
       description:
         '短いタスクの説明文を作成します。期限・担当者の創作は禁止です。挨拶文は禁止です。',
+      example_output: {
+        subject: '掲示板の張り替え',
+        body: `・掲示板の内容をX月X日までに最新のお知らせへ差し替えてください。
+・古い掲示物は事務局で保管してください。
+・作業後は写真を撮り、記録として共有してください。`,
+      },
       btn_label_draft: 'Geminiでタスク説明を作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: TASK_PROMPT_DRAFT,
@@ -278,6 +332,14 @@
       label: '業務マニュアル（手順書）',
       description:
         '手順を番号付きで示す業務マニュアルを作成します。挨拶文は禁止です。',
+      example_output: {
+        subject: '来客対応マニュアル',
+        body: `1. 来客があった場合は、受付にて氏名と訪問先を確認します。
+2. 訪問先の担当者へ内線で取次ぎを行います。
+3. 担当者が不在の場合は、伝言メモを預かり、後ほど連絡します。
+■注意事項
+来客情報は個人が特定できない形で記録してください。`,
+      },
       btn_label_draft: 'Geminiでマニュアルを作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: MANUAL_PROMPT_DRAFT,
@@ -292,6 +354,19 @@
       label: '議事録',
       description:
         '会議の議事録を作成します。メモに記載のない事実は補完せず、不足項目は備考に明示します。挨拶文は禁止です。',
+      example_output: {
+        subject: '定例理事会議事録',
+        body: `■開催概要
+X月X日、管理組合事務室にて定例理事会を開催しました。
+■決定事項
+・共用部照明のLED化を次期修繕計画に盛り込むことを決定しました。
+■継続審議事項
+・駐輪場の増設については次回以降も検討を継続します。
+■次回開催
+次回はX月X日を予定しています。
+■備考
+記録者の指名については、メモに記載がないため要追記です。`,
+      },
       btn_label_draft: 'Geminiで議事録を作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: MINUTES_PROMPT_DRAFT,
@@ -306,6 +381,17 @@
       label: '汎用ビジネス文書',
       description:
         '社内外向けの汎用ビジネス文書を作成します。冒頭の挨拶は禁止、結びの一文のみ許容します。',
+      example_output: {
+        subject: '修繕積立金の運用について',
+        body: `■趣旨
+修繕積立金の一部を活用した設備更新について、方針をご説明します。
+■内容
+・対象設備は共用部の給水ポンプです。
+・更新時期はX月を予定しています。
+■背景
+経年劣化により、故障リスクが高まっているため更新を計画しています。
+今後ともよろしくお願いいたします。`,
+      },
       btn_label_draft: 'Geminiで文書を作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: BUSINESS_PROMPT_DRAFT,
@@ -320,6 +406,14 @@
       label: 'メール・依頼文',
       description:
         '社外・関係者向けのメール文面を作成します。冒頭の挨拶と結びを必ず含めます。',
+      example_output: {
+        subject: '共用部工事日程のご案内',
+        body: `いつもお世話になっております。
+
+このたび、共用部の外壁補修工事を実施することになりましたので、ご案内いたします。工事期間はX月X日からX月X日までを予定しており、作業中は一部の通路が通行止めとなります。
+
+ご不便をおかけいたしますが、何卒よろしくお願いいたします。`,
+      },
       btn_label_draft: 'Geminiでメール文面を作成',
       btn_label_summary: 'Geminiで要約',
       prompt_draft: MAIL_PROMPT_DRAFT,
