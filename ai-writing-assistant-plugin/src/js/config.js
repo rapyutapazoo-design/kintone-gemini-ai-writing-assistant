@@ -34,6 +34,7 @@
     ]),
     format_default: DEFAULT_FORMAT_INSTRUCTION,
     overwrite_confirm: 'yes',
+    gemini_thinking: 'suppress',
     preset_id: '',
     clear_input_after_draft: 'no',
     field_input_backup: '',
@@ -1155,6 +1156,9 @@
         .checked
         ? 'no'
         : 'yes',
+      gemini_thinking: document.getElementById('obp-thinking-default').checked
+        ? 'default'
+        : 'suppress',
       preset_id: appliedPresetId || '',
       clear_input_after_draft: document.getElementById(
         'obp-clear-input-after-draft',
@@ -1495,6 +1499,13 @@
       overwriteVal === 'no'
         ? 'obp-overwrite-confirm-no'
         : 'obp-overwrite-confirm-yes',
+    ).checked = true;
+
+    // キー無し・不正値は抑制（既定）。文字どおり 'default' のときのみ既定任せ。
+    document.getElementById(
+      config.gemini_thinking === 'default'
+        ? 'obp-thinking-default'
+        : 'obp-thinking-suppress',
     ).checked = true;
 
     const formatModeVal = config.format_mode || DEFAULTS.format_mode;

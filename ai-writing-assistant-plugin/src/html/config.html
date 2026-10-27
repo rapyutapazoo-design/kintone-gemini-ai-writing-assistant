@@ -44,6 +44,23 @@
           <input type="text" id="obp-model-manual" disabled style="display:none" placeholder="例: gemini-flash-lite-latest">
         </div>
       </div>
+
+      <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">AIの思考（thinking）</div>
+        <div class="kintoneplugin-desc">
+          Pro系モデルは思考を止められないため、抑制を選んでも思考の指定は送りません。抑制の指定をモデルが受け付けない場合は、自動で指定を外して再送します。
+        </div>
+        <div class="kintoneplugin-input-outer">
+          <label>
+            <input type="radio" name="obp-thinking" id="obp-thinking-suppress" value="suppress">
+            抑制する（既定・推奨）: 応答が速くなり、kintoneの制限時間内に収まりやすくなります
+          </label>
+          <label>
+            <input type="radio" name="obp-thinking" id="obp-thinking-default" value="default">
+            モデルの既定に任せる: 複雑な文章で品質が上がる場合がありますが、時間がかかりタイムアウトしやすくなります
+          </label>
+        </div>
+      </div>
     </div>
   </details>
 

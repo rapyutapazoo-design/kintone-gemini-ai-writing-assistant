@@ -1,3 +1,4 @@
+// eslint-disable-next-line max-statements -- モジュール全体を1つのIIFEで公開する構成のため、文数が上限を超える
 (function (global) {
   'use strict';
 
@@ -36,7 +37,18 @@
   ];
   const RETRY_STATUSES = [429, 500, 503];
   const RETRY_MAX_ATTEMPTS = 3;
-  const RETRY_BASE_DELAY_MS = 1000;
+  // 503 の混雑は数秒では解消しにくいため、待ち時間を長めに取る。
+  const RETRY_BASE_DELAY_MS = 2000;
+  // 429 の本文が示す待ち時間（retryDelay）がこの値を超える場合は、同一モデルでの
+  // 再試行を打ち切って軽量モデルへ切り替える。
+  const RETRY_MAX_SERVER_DELAY_MS = 10000;
+  // 主モデル＋フォールバックを合わせた全体の待ち時間の上限（最悪値）。
+  const TOTAL_DEADLINE_MS = 90000;
+  const THINKING_MODE_SUPPRESS = 'suppress';
+  const THINKING_MODE_DEFAULT = 'default';
+  // thinkingConfig を受け付けないと判明したモデル名（セッション内のみ保持。
+  // localStorage には保存しない）。
+  const thinkingRejectedModels = new Set();
 
   function stripModelPrefix(name) {
     const str = String(name || '');
@@ -421,16 +433,24 @@
     });
   }
 
-  function delayWithJitter(attempt) {
+  // 待ち時間の算出と待機を分け、呼び出し側が期限との照合に使えるようにする。
+  function computeRetryWaitMs(attempt) {
     const base = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-    const wait = Math.round(base * (0.5 + Math.random() * 0.5));
-    return new Promise((resolve) => setTimeout(resolve, wait));
+    return Math.round(base * (0.5 + Math.random() * 0.5));
   }
 
-  // 429/500/503 のみ指数バックオフ・リトライ（最大3回）する。400/401/403/404、
-  // および status:0（タイムアウト。PROXY_TIMEOUT_MS が40秒のため再試行すると
-  // 最悪3分弱になる）は絶対にリトライしない。proxyRequest が reject した場合
-  // （proxy 呼び出し自体のエラー）も再試行せずそのまま例外を伝播する。
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // 429/500/503 のみ指数バックオフ・リトライ（既定で最大3回）する。400/401/403/
+  // 404、および status:0（タイムアウト。PROXY_TIMEOUT_MS が40秒のため再試行
+  // すると最悪3分弱になる）は絶対にリトライしない。proxyRequest が reject した
+  // 場合（proxy 呼び出し自体のエラー）も再試行せずそのまま例外を伝播する。
+  // 7番目の省略可能な options（6引数での呼び出しとも互換）:
+  //   deadlineAt      全体の期限（epoch ms）。次の送信が収まらなければ打ち切る
+  //   maxAttempts     再試行回数の上限（既定は RETRY_MAX_ATTEMPTS）
+  //   shouldStopRetry 直前の応答 res を受け取り、true なら再試行せず返す
   async function proxyRequestWithRetry(
     pluginId,
     url,
@@ -438,23 +458,342 @@
     headers,
     data,
     onRetry,
+    options,
   ) {
-    for (let attempt = 0; attempt <= RETRY_MAX_ATTEMPTS; attempt++) {
+    const opts = options || {};
+    const maxAttempts =
+      typeof opts.maxAttempts === 'number'
+        ? opts.maxAttempts
+        : RETRY_MAX_ATTEMPTS;
+    for (let attempt = 0; attempt <= maxAttempts; attempt++) {
       const res = await proxyRequest(pluginId, url, method, headers, data);
       const shouldRetry =
-        attempt < RETRY_MAX_ATTEMPTS &&
-        RETRY_STATUSES.indexOf(res.status) !== -1;
+        attempt < maxAttempts && RETRY_STATUSES.indexOf(res.status) !== -1;
       if (!shouldRetry) {
         return res;
       }
-      if (typeof onRetry === 'function') {
-        onRetry(attempt + 1, RETRY_MAX_ATTEMPTS + 1, res.status);
+      if (
+        typeof opts.shouldStopRetry === 'function' &&
+        opts.shouldStopRetry(res)
+      ) {
+        return res;
       }
-      await delayWithJitter(attempt);
+      const wait = computeRetryWaitMs(attempt);
+      if (
+        typeof opts.deadlineAt === 'number' &&
+        Date.now() + wait > opts.deadlineAt - PROXY_TIMEOUT_MS
+      ) {
+        return res;
+      }
+      if (typeof onRetry === 'function') {
+        onRetry(attempt + 1, maxAttempts + 1, res.status);
+      }
+      await sleep(wait);
     }
-    // ループ内で attempt === RETRY_MAX_ATTEMPTS のとき必ず return するため、
+    // ループ内で attempt === maxAttempts のとき必ず return するため、
     // ここには到達しない。
     throw new Error('proxyRequestWithRetry: unreachable');
+  }
+
+  // ---------------------------------------------------------
+  // thinking 抑制・フォールバックの純粋関数
+  // ---------------------------------------------------------
+
+  // 文字どおり 'default' のときのみ既定任せ。キー無し・不正値は抑制にする。
+  function normalizeThinkingMode(value) {
+    return value === THINKING_MODE_DEFAULT
+      ? THINKING_MODE_DEFAULT
+      : THINKING_MODE_SUPPRESS;
+  }
+
+  function bareLowerName(name) {
+    let str = String(name || '').toLowerCase();
+    while (str.indexOf('models/') === 0) {
+      str = str.slice('models/'.length);
+    }
+    return str;
+  }
+
+  // モデル名から世代・系統を推定する。tier の判定順は lite → flash → pro。
+  function detectModelFamily(bareName) {
+    const lower = bareLowerName(bareName);
+    const m = /gemini-(\d+(?:\.\d+)?)-/.exec(lower);
+    let tier = 'other';
+    if (lower.indexOf('lite') !== -1) {
+      tier = 'lite';
+    } else if (lower.indexOf('flash') !== -1) {
+      tier = 'flash';
+    } else if (lower.indexOf('pro') !== -1) {
+      tier = 'pro';
+    }
+    return {
+      version: m ? parseFloat(m[1]) : null,
+      isAlias: /-latest$/.test(lower),
+      tier: tier,
+    };
+  }
+
+  // thinking 抑制用の thinkingConfig を返す（送らない場合は null）。
+  // 注意: thinkingBudget（2.5系）と thinkingLevel（3系以降）は同時に送らない
+  // （両方指定すると API が 400 を返す）。どちらか一方のみ返すこと。
+  function buildThinkingConfig(modelName, mode) {
+    if (normalizeThinkingMode(mode) === THINKING_MODE_DEFAULT) {
+      return null;
+    }
+    const lower = bareLowerName(modelName);
+    if (thinkingRejectedModels.has(lower)) {
+      return null;
+    }
+    const family = detectModelFamily(lower);
+    // Pro 系は思考を止められないため何も送らない。
+    if (family.tier === 'pro') {
+      return null;
+    }
+    if (lower.indexOf('gemini-') !== 0) {
+      return null;
+    }
+    if (family.version === 2.5) {
+      return { thinkingBudget: 0 };
+    }
+    if (family.version !== null && family.version >= 3) {
+      return { thinkingLevel: 'minimal' };
+    }
+    if (family.version !== null) {
+      return null;
+    }
+    // 世代なしの -latest エイリアスは 2.5 系を指す前提で thinkingBudget:0 を
+    // 送る。外れた場合は 400 安全網（isThinkingConfigError）で回復する。
+    if (family.isAlias) {
+      return { thinkingBudget: 0 };
+    }
+    return null;
+  }
+
+  // 元の本文を変更せず、thinkingConfig を入れた複製を返す。
+  function applyThinkingConfig(body, thinkingConfig) {
+    if (!thinkingConfig) {
+      return body;
+    }
+    const copy = Object.assign({}, body);
+    copy.generationConfig = Object.assign({}, body && body.generationConfig, {
+      thinkingConfig: thinkingConfig,
+    });
+    return copy;
+  }
+
+  // thinkingConfig が原因の 400 か（kintone 自身のエラーは除く）。
+  function isThinkingConfigError(status, bodyJson) {
+    if (status !== 400) {
+      return false;
+    }
+    const parsed = parseErrorBody(bodyJson);
+    if (parsed.kintoneCode) {
+      return false;
+    }
+    const msg =
+      bodyJson && bodyJson.error && bodyJson.error.message
+        ? String(bodyJson.error.message)
+        : '';
+    return /thinking/i.test(msg);
+  }
+
+  // 失敗の種類: 'ok' | 'timeout' | 'busy' | 'thinking' | 'other'
+  function classifyFailureKind(status, bodyJson, bodyText) {
+    if (status >= 200 && status < 300) {
+      return 'ok';
+    }
+    const parsed = parseErrorBody(bodyJson);
+    if (
+      status === 0 ||
+      parsed.kintoneCode === 'GAIA_PR03' ||
+      String(bodyText || '')
+        .toLowerCase()
+        .indexOf('gaia_pr03') !== -1
+    ) {
+      return 'timeout';
+    }
+    if (RETRY_STATUSES.indexOf(status) !== -1) {
+      return 'busy';
+    }
+    if (isThinkingConfigError(status, bodyJson)) {
+      return 'thinking';
+    }
+    return 'other';
+  }
+
+  // 429 本文の error.details[].retryDelay（例: "37s"）をミリ秒で返す。
+  function getServerRetryDelayMs(bodyJson) {
+    const details =
+      bodyJson && bodyJson.error && Array.isArray(bodyJson.error.details)
+        ? bodyJson.error.details
+        : [];
+    for (let i = 0; i < details.length; i++) {
+      const d = details[i];
+      const m =
+        d && typeof d.retryDelay === 'string'
+          ? /^(\d+(?:\.\d+)?)s$/.exec(d.retryDelay)
+          : null;
+      if (m) {
+        return Math.round(parseFloat(m[1]) * 1000);
+      }
+    }
+    return null;
+  }
+
+  function getModelWeight(bareName) {
+    const speedClass = getModelSpeedClass(bareName);
+    if (speedClass === 'fast') return 0;
+    if (speedClass === 'normal') return 1;
+    return 2;
+  }
+
+  // 現在のモデルと同等以下の重さで、別の最軽量モデルを返す（無ければ null）。
+  function pickFallbackModel(currentModel, excludeModels) {
+    const currentWeight = getModelWeight(stripModelPrefix(currentModel));
+    const currentNorm = normalizeModelName(currentModel);
+    const excluded = (Array.isArray(excludeModels) ? excludeModels : []).map(
+      normalizeModelName,
+    );
+    let best = null;
+    let bestWeight = Infinity;
+    FALLBACK_MODELS.forEach((candidate) => {
+      const weight = getModelWeight(candidate);
+      const norm = normalizeModelName(candidate);
+      if (
+        weight <= currentWeight &&
+        norm !== currentNorm &&
+        excluded.indexOf(norm) === -1 &&
+        weight < bestWeight
+      ) {
+        best = candidate;
+        bestWeight = weight;
+      }
+    });
+    return best;
+  }
+
+  // ---------------------------------------------------------
+  // オーケストレーター
+  // ---------------------------------------------------------
+
+  // 主モデルで生成し、混雑（429/500/503）またはタイムアウトで失敗したら、より
+  // 軽いモデルへ1回だけ切り替える。options: { model, body, thinkingMode,
+  // onProgress }。proxyRequest の reject はそのまま伝播する。
+  async function generateContentWithFallback(pluginId, options) {
+    const opts = options || {};
+    const primaryModel = stripModelPrefix(opts.model);
+    const baseBody = opts.body;
+    const thinkingMode = normalizeThinkingMode(opts.thinkingMode);
+    const onProgress =
+      typeof opts.onProgress === 'function' ? opts.onProgress : function () {};
+    const deadlineAt = Date.now() + TOTAL_DEADLINE_MS;
+    let thinkingDropped = false;
+
+    function sendOnce(model, body, maxAttempts, stopRetryFn) {
+      const url =
+        PROXY_POST_PREFIX + stripModelPrefix(model) + ':generateContent';
+      // headerのx-goog-api-keyはプロキシ設定側で自動的に付与される。
+      return proxyRequestWithRetry(
+        pluginId,
+        url,
+        'POST',
+        { 'Content-Type': 'application/json' },
+        body,
+        (attempt, total, status) =>
+          onProgress({
+            type: 'retry',
+            attempt: attempt,
+            total: total,
+            status: status,
+          }),
+        {
+          deadlineAt: deadlineAt,
+          maxAttempts: maxAttempts,
+          shouldStopRetry: stopRetryFn,
+        },
+      );
+    }
+
+    async function requestModel(model, maxAttempts, stopRetryFn) {
+      const bare = stripModelPrefix(model);
+      const thinkingConfig = buildThinkingConfig(bare, thinkingMode);
+      let res = await sendOnce(
+        model,
+        applyThinkingConfig(baseBody, thinkingConfig),
+        maxAttempts,
+        stopRetryFn,
+      );
+      if (
+        thinkingConfig &&
+        isThinkingConfigError(res.status, safeParseJson(res.body)) &&
+        !(deadlineAt && Date.now() > deadlineAt - PROXY_TIMEOUT_MS)
+      ) {
+        // 安全網: このモデルは thinkingConfig を受け付けないため、記録して
+        // 外した本文で1回だけ再送する。
+        thinkingRejectedModels.add(bare.toLowerCase());
+        console.warn(
+          'thinkingConfig が拒否されたため、指定を外して再送します: ' + bare,
+        );
+        onProgress({ type: 'thinking_retry', model: bare });
+        thinkingDropped = true;
+        res = await sendOnce(model, baseBody, maxAttempts, stopRetryFn);
+      }
+      return res;
+    }
+
+    // 429 でサーバーが長い待ちを指示している場合は同一モデルで粘らない。
+    function shouldStopRetry(res) {
+      if (res.status !== 429) {
+        return false;
+      }
+      const delay = getServerRetryDelayMs(safeParseJson(res.body));
+      return delay !== null && delay > RETRY_MAX_SERVER_DELAY_MS;
+    }
+
+    const primary = await requestModel(
+      primaryModel,
+      RETRY_MAX_ATTEMPTS,
+      shouldStopRetry,
+    );
+    const result = {
+      status: primary.status,
+      body: primary.body,
+      modelUsed: primaryModel,
+      primaryModel: primaryModel,
+      fallbackReason: null,
+      primaryResult: primary,
+      thinkingDropped: thinkingDropped,
+      fallbackModel: null,
+      fallbackResult: null,
+    };
+
+    const kind = classifyFailureKind(
+      primary.status,
+      safeParseJson(primary.body),
+      primary.body,
+    );
+    if (kind !== 'busy' && kind !== 'timeout') {
+      return result;
+    }
+    const fallbackModel = pickFallbackModel(primaryModel, []);
+    if (!fallbackModel || Date.now() > deadlineAt - PROXY_TIMEOUT_MS) {
+      return result;
+    }
+
+    const bareFallback = stripModelPrefix(fallbackModel);
+    onProgress({ type: 'fallback', model: bareFallback, reason: kind });
+    // フォールバックは同一モデルでのリトライを行わない（0回）。
+    const fb = await requestModel(bareFallback, 0, null);
+    result.fallbackModel = bareFallback;
+    result.fallbackResult = fb;
+    result.thinkingDropped = thinkingDropped;
+    if (fb.status >= 200 && fb.status < 300) {
+      result.status = fb.status;
+      result.body = fb.body;
+      result.modelUsed = bareFallback;
+      result.fallbackReason = kind;
+    }
+    return result;
   }
 
   function extractText(data) {
@@ -577,6 +916,11 @@
     PROXY_TIMEOUT_MS: PROXY_TIMEOUT_MS,
     MAX_LIST_PAGES: MAX_LIST_PAGES,
     RETRY_MAX_ATTEMPTS: RETRY_MAX_ATTEMPTS,
+    RETRY_BASE_DELAY_MS: RETRY_BASE_DELAY_MS,
+    RETRY_MAX_SERVER_DELAY_MS: RETRY_MAX_SERVER_DELAY_MS,
+    TOTAL_DEADLINE_MS: TOTAL_DEADLINE_MS,
+    THINKING_MODE_SUPPRESS: THINKING_MODE_SUPPRESS,
+    THINKING_MODE_DEFAULT: THINKING_MODE_DEFAULT,
     normalizeModelName: normalizeModelName,
     stripModelPrefix: stripModelPrefix,
     fetchWithTimeout: fetchWithTimeout,
@@ -591,6 +935,15 @@
     checkModelAvailability: checkModelAvailability,
     proxyRequest: proxyRequest,
     proxyRequestWithRetry: proxyRequestWithRetry,
+    normalizeThinkingMode: normalizeThinkingMode,
+    detectModelFamily: detectModelFamily,
+    buildThinkingConfig: buildThinkingConfig,
+    applyThinkingConfig: applyThinkingConfig,
+    isThinkingConfigError: isThinkingConfigError,
+    classifyFailureKind: classifyFailureKind,
+    getServerRetryDelayMs: getServerRetryDelayMs,
+    pickFallbackModel: pickFallbackModel,
+    generateContentWithFallback: generateContentWithFallback,
     extractText: extractText,
     tryParseJsonPayload: tryParseJsonPayload,
     escapeHtml: escapeHtml,
