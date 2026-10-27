@@ -33,6 +33,8 @@
 {{body}}`;
 
   const GEMINI_MODEL = config.gemini_model || client.DEFAULT_MODEL;
+  // 保存済み設定にキーが無い場合も抑制（既定）になる。
+  const THINKING_MODE = client.normalizeThinkingMode(config.gemini_thinking);
   const F_INPUT = config.field_input || 'keyword_input';
   const F_LENGTH =
     config.field_length === undefined ? 'length_option' : config.field_length;
@@ -445,7 +447,8 @@
     showSpinner();
 
     try {
-      const rawText = await callGeminiAPI(prompt, true);
+      const result = await callGeminiAPI(prompt, true);
+      const rawText = result.text;
       const data = client.tryParseJsonPayload(rawText);
 
       const currentRecord = appManager.record.get();
@@ -477,6 +480,18 @@
       // クリア直後もその場で復元できるよう、更新後のレコードで
       // 復元ボタンを再描画する（重要2）。
       renderRestoreButton(currentRecord.record, isMobile, appManager);
+
+      if (result.fallbackReason) {
+        console.info(
+          'Gemini fallback: ' +
+            result.fallbackReason +
+            ' ' +
+            GEMINI_MODEL +
+            ' -> ' +
+            result.modelUsed,
+        );
+        showNotice(buildFallbackNoticeText(result) + '内容をご確認ください。');
+      }
     } catch (error) {
       console.error(error);
       alert(buildApiErrorMessage('生成', error));
@@ -500,7 +515,8 @@
     showSpinner();
 
     try {
-      const resultText = await callGeminiAPI(prompt, false);
+      const result = await callGeminiAPI(prompt, false);
+      const resultText = result.text;
       const body = { app: appId, id: recordId, record: {} };
       body.record[F_SUMMARY] = {
         value:
@@ -509,7 +525,19 @@
             : resultText,
       };
       await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body);
-      alert('要約が完了しました。ページを更新します。');
+      let doneMessage = '要約が完了しました。ページを更新します。';
+      if (result.fallbackReason) {
+        console.info(
+          'Gemini fallback: ' +
+            result.fallbackReason +
+            ' ' +
+            GEMINI_MODEL +
+            ' -> ' +
+            result.modelUsed,
+        );
+        doneMessage += '\n' + buildFallbackNoticeText(result);
+      }
+      alert(doneMessage);
       location.reload();
     } catch (error) {
       console.error(error);
@@ -517,6 +545,22 @@
     } finally {
       hideSpinner();
     }
+  }
+
+  // フォールバック生成時にどのモデルで作成したかを伝える文。
+  function buildFallbackNoticeText(result) {
+    const lead =
+      result.fallbackReason === 'timeout'
+        ? 'Geminiの応答に時間がかかったため、'
+        : 'Geminiが混雑していたため、';
+    return (
+      lead +
+      '軽量モデル「' +
+      result.modelUsed +
+      '」で作成しました（通常は「' +
+      GEMINI_MODEL +
+      '」）。'
+    );
   }
 
   // API失敗時のalertメッセージを組み立てる。
@@ -531,13 +575,14 @@
       return (
         prefix +
         'に失敗しました。選択中のモデル（' +
-        GEMINI_MODEL +
+        (error.primaryModel || GEMINI_MODEL) +
         '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
         error.message
       );
     }
 
     const status = error.classified && error.classified.status;
+    const fallbackTried = !!error.fallbackModel;
 
     const haystack = (
       String(error.responseBody || '') +
@@ -548,9 +593,16 @@
     ).toLowerCase();
     const isGaiaTimeout = status === 0 || haystack.indexOf('gaia_pr03') !== -1;
     if (isGaiaTimeout) {
+      const guide = fallbackTried
+        ? '軽量モデル（' +
+          error.fallbackModel +
+          '）でも再試行しましたが間に合いませんでした。少し時間をおいて再実行するか、メモを短くしてお試しください。'
+        : '少し時間をおいて再実行してください。改善しない場合は、プラグイン設定の「AIの思考（thinking）」で「抑制する」が選ばれ、高速モデルが選ばれているか管理者にご確認ください。';
       return (
         prefix +
-        'に失敗しました。\nGeminiの応答がkintoneの制限時間内に返りませんでした。混雑している可能性があります。\n少し時間をおいて再実行するか、プラグイン設定で「高速」と表示されたモデルをお試しください。\n' +
+        'に失敗しました。\nGeminiの応答がkintoneの制限時間内に返りませんでした。' +
+        guide +
+        '\n' +
         error.message
       );
     }
@@ -563,10 +615,22 @@
       );
     }
 
-    if (status === 503 || status === 500 || status === 429) {
+    if (status === 429) {
       return (
         prefix +
-        'に失敗しました。\nGemini側が一時的に混雑しています。数分おいて再度お試しください。\n（自動で再試行しましたが復旧しませんでした）\n' +
+        'に失敗しました。\nGemini APIの利用上限（レート上限）に達した可能性があります。時間をおいて再度お試しください。続く場合は、管理者がGoogle AI Studioで利用状況と上限をご確認ください。\n' +
+        error.message
+      );
+    }
+
+    if (status === 503 || status === 500) {
+      return (
+        prefix +
+        'に失敗しました。\nGemini側が一時的に混雑しています。\n自動で再試行し' +
+        (fallbackTried
+          ? '、軽量モデル（' + error.fallbackModel + '）にも切り替え'
+          : '') +
+        'ましたが復旧しませんでした。数分おいて再度お試しください。\n' +
         error.message
       );
     }
@@ -578,12 +642,8 @@
     );
   }
 
+  // 戻り値: { text, modelUsed, fallbackReason }
   function callGeminiAPI(prompt, requireJson = true) {
-    // kintoneプロキシ経由でのリクエストURL
-    const url =
-      client.PROXY_POST_PREFIX +
-      client.stripModelPrefix(GEMINI_MODEL) +
-      ':generateContent';
     const data = {
       contents: [{ parts: [{ text: prompt }] }],
     };
@@ -592,20 +652,39 @@
       data.generationConfig = { responseMimeType: 'application/json' };
     }
 
-    // headerのx-goog-api-keyはプロキシ設定側で自動的に付与されます
+    // maxOutputTokens は付けない（思考トークンが上限に含まれ、本文切れや
+    // JSON解析失敗を招く恐れがあるため）。
     return client
-      .proxyRequestWithRetry(
-        PLUGIN_ID,
-        url,
-        'POST',
-        { 'Content-Type': 'application/json' },
-        data,
-        (attempt, total) =>
-          setSpinnerText(
-            '混雑のため再試行しています…（' + attempt + '/' + total + '）',
-          ),
-      )
-      .then(({ status, body }) => {
+      .generateContentWithFallback(PLUGIN_ID, {
+        model: GEMINI_MODEL,
+        body: data,
+        thinkingMode: THINKING_MODE,
+        onProgress: (ev) => {
+          if (ev.type === 'retry') {
+            setSpinnerText(
+              '混雑のため再試行しています…（' +
+                ev.attempt +
+                '/' +
+                ev.total +
+                '）',
+            );
+          } else if (ev.type === 'fallback') {
+            setSpinnerText(
+              ev.reason === 'timeout'
+                ? '応答に時間がかかったため、軽量モデル（' +
+                    ev.model +
+                    '）で再試行しています…'
+                : '混雑のため軽量モデル（' +
+                    ev.model +
+                    '）に切り替えて再試行しています…',
+            );
+          } else if (ev.type === 'thinking_retry') {
+            setSpinnerText('設定を調整して再送しています…');
+          }
+        },
+      })
+      .then((result) => {
+        const { status, body } = result;
         if (status >= 200 && status < 300) {
           let json;
           try {
@@ -617,12 +696,21 @@
           if (!text) {
             throw new Error('AIからの応答が空でした。');
           }
-          return text;
+          return {
+            text: text,
+            modelUsed: result.modelUsed,
+            fallbackReason: result.fallbackReason,
+          };
         }
         const c = client.classifyError(status, client.safeParseJson(body));
         const err = new Error('API Error ' + status + ': ' + c.message);
         err.classified = c;
         err.responseBody = String(body == null ? '' : body);
+        err.primaryModel = result.primaryModel;
+        err.fallbackModel = result.fallbackModel;
+        err.fallbackStatus = result.fallbackResult
+          ? result.fallbackResult.status
+          : undefined;
         throw err;
       });
   }
@@ -641,6 +729,8 @@
   // 前画面で開かれたまま残っている復元モーダルを除去する。
   // 各 kintone.events.on ハンドラの冒頭から呼び出す。
   function removeOrphanedRestoreModal() {
+    // SPA 遷移後に通知（obp-notice）が残らないよう、ここで一緒に片付ける。
+    removeNotice();
     if (activeRestoreModalCleanup) {
       const cleanupFn = activeRestoreModalCleanup;
       activeRestoreModalCleanup = null;
@@ -915,6 +1005,41 @@
       overlay.style.transition = 'opacity 0.5s';
       setTimeout(() => overlay.remove(), 500);
     }
+  }
+
+  // 画面下部に固定表示する短い通知。1件のみ、8秒で自動消去する。
+  let noticeTimer = null;
+
+  function removeNotice() {
+    if (noticeTimer) {
+      clearTimeout(noticeTimer);
+      noticeTimer = null;
+    }
+    document.querySelectorAll('.obp-notice').forEach(function (el) {
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+    });
+  }
+
+  function showNotice(message) {
+    removeNotice();
+    const box = document.createElement('div');
+    box.className = 'obp-notice';
+    box.setAttribute('role', 'status');
+    const text = document.createElement('span');
+    text.className = 'obp-notice-text';
+    text.textContent = message;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'obp-notice-close';
+    close.setAttribute('aria-label', '閉じる');
+    close.textContent = '×';
+    close.addEventListener('click', removeNotice);
+    box.appendChild(text);
+    box.appendChild(close);
+    document.body.appendChild(box);
+    noticeTimer = setTimeout(removeNotice, 8000);
   }
 
   // リトライ中の待機理由をスピナーに表示する。スピナー非表示中や要素が
