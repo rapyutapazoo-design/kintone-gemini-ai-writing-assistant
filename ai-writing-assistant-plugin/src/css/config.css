@@ -260,3 +260,65 @@
   font-size: 13px;
   line-height: 1.7;
 }
+
+.obp-provider-block {
+  border-left: 4px solid #d9e1e6;
+  padding: 4px 0 4px 16px;
+  margin-bottom: 20px;
+}
+
+.obp-provider-inactive {
+  opacity: .55;
+}
+
+.obp-provider-inactive-label {
+  color: #888;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.obp-order-options {
+  margin: 8px 0 20px;
+}
+
+.obp-order-options label {
+  display: block;
+  margin: 4px 0;
+}
+
+.obp-pii-note {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .settings {
+    padding: 12px;
+  }
+
+  .settings input[type='text'],
+  .settings input[type='password'],
+  .settings select,
+  .settings textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0 !important;
+  }
+
+  .settings .obp-section-body,
+  .settings .kintoneplugin-input-outer {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .settings .obp-map-table {
+    table-layout: fixed;
+  }
+
+  .settings .obp-map-table th,
+  .settings .obp-map-table td {
+    overflow-wrap: anywhere;
+  }
+}
