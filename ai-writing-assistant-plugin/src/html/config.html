@@ -1,15 +1,48 @@
 <section class="settings">
-  <h2 class="settings-heading">AI文章作成アシスタント（Gemini）プラグイン設定</h2>
+  <h2 class="settings-heading">AI文章作成アシスタント プラグイン設定</h2>
 
   <div id="obp-message" class="obp-banner" style="display:none"></div>
 
   <details class="obp-section" open>
-    <summary class="obp-section-heading">1. Gemini接続設定</summary>
+    <summary class="obp-section-heading">1. AI接続設定</summary>
     <div class="obp-section-body">
+      <h3 class="obp-subheading">使用する順番</h3>
+      <div class="kintoneplugin-desc">失敗・タイムアウト・混雑時に自動で次のAIへ切り替えます。再試行を含め、最大90秒程度待つ場合があります。</div>
+      <div class="obp-order-options">
+        <label><input type="radio" name="obp-provider-order" id="obp-provider-order-anthropic-gemini" value="anthropic,gemini"> Claude優先・失敗時Gemini（推奨）</label>
+        <label><input type="radio" name="obp-provider-order" id="obp-provider-order-gemini" value="gemini"> Geminiのみ（従来どおり）</label>
+        <label><input type="radio" name="obp-provider-order" id="obp-provider-order-anthropic" value="anthropic"> Claudeのみ</label>
+        <label><input type="radio" name="obp-provider-order" id="obp-provider-order-gemini-anthropic" value="gemini,anthropic"> Gemini優先・失敗時Claude</label>
+      </div>
+
+      <h3 class="obp-subheading">Claude（Anthropic）<span id="obp-anthropic-inactive-label" class="obp-provider-inactive-label"></span></h3>
+      <div id="obp-anthropic-block" class="obp-provider-block">
+        <div class="kintoneplugin-row">
+          <div class="kintoneplugin-label">Claude APIキー</div>
+          <div class="kintoneplugin-desc">Claudeを使う場合は必須です。Anthropic Consoleで取得してください。変更しない場合は空欄のまま保存できます。</div>
+          <div class="kintoneplugin-input-outer"><input type="password" id="obp-anthropic-api-key" class="kintoneplugin-input-text" placeholder="変更する場合のみ入力"> <button type="button" id="obp-anthropic-api-key-toggle">表示</button></div>
+          <p id="obp-anthropic-api-key-status" class="obp-api-key-status"></p>
+        </div>
+        <div class="kintoneplugin-row">
+          <div class="kintoneplugin-label">Claudeモデル</div>
+          <div class="kintoneplugin-desc">APIキーを使って利用可能なモデルを取得します。モデル情報のGETで確認し、文章生成は行いません。高速・低速の表示はモデル名から推定した目安です。</div>
+          <div class="kintoneplugin-input-outer"><select id="obp-anthropic-model-select" class="kintoneplugin-select"></select> <button type="button" id="obp-anthropic-model-refresh">モデル一覧を再取得</button> <span id="obp-anthropic-model-status" class="obp-status-loading">未確認</span></div>
+          <div class="kintoneplugin-input-outer"><label><input type="checkbox" id="obp-anthropic-model-show-all"> 低速なモデル（Opus等）も表示する</label></div>
+          <div class="kintoneplugin-input-outer"><label><input type="checkbox" id="obp-anthropic-model-manual-check"> 一覧にないモデル名を手入力する</label> <input type="text" id="obp-anthropic-model-manual" disabled style="display:none" placeholder="APIで確認したモデルIDを入力"></div>
+        </div>
+        <div class="kintoneplugin-row">
+          <div class="kintoneplugin-label">AIの思考（thinking）</div>
+          <div class="kintoneplugin-desc">抑制の指定をモデルが受け付けない場合は、指定を外して再送します。</div>
+          <div class="kintoneplugin-input-outer"><label><input type="radio" name="obp-anthropic-thinking" id="obp-anthropic-thinking-suppress" value="suppress"> 抑制する（既定・推奨）</label> <label><input type="radio" name="obp-anthropic-thinking" id="obp-anthropic-thinking-default" value="default"> モデルの既定に任せる</label></div>
+        </div>
+      </div>
+
+      <h3 class="obp-subheading">Gemini<span id="obp-gemini-inactive-label" class="obp-provider-inactive-label"></span></h3>
+      <div id="obp-gemini-block" class="obp-provider-block">
       <div class="kintoneplugin-row">
-        <div class="kintoneplugin-label">Gemini APIキー<span class="kintoneplugin-require">*</span></div>
+        <div class="kintoneplugin-label">Gemini APIキー</div>
         <div class="kintoneplugin-desc">
-          Google AI Studio等で取得したAPIキーを入力してください。<br>
+          Geminiを使う場合は必須です。Google AI Studio等で取得したAPIキーを入力してください。<br>
           一度保存したAPIキーはkintoneに保持されます。変更しない場合は空欄のまま保存してください。セキュリティのため保存済みのキーは画面に表示しません（キーを変更するときだけ新しいキーを入力してください）。
         </div>
         <div class="kintoneplugin-input-outer">
@@ -20,7 +53,7 @@
       </div>
 
       <div class="kintoneplugin-row">
-        <div class="kintoneplugin-label">Geminiモデル<span class="kintoneplugin-require">*</span></div>
+        <div class="kintoneplugin-label">Geminiモデル</div>
         <div class="kintoneplugin-desc">
           保存済みのAPIキー（またはこの画面で入力したAPIキー）を使って、利用可能なモデルの一覧を自動取得します。既定では文章生成に適した推奨モデルのみを表示します。モデルを選択すると自動で疎通確認を行います。疎通確認はモデル情報の取得のみで行い、文章生成は行いません（課金されません）。<br>
           kintoneには外部APIの応答時間に制限があるため、高速なモデルを推奨します。一覧の「高速／標準／低速」はモデル名から推定した<strong>目安（推定）</strong>です。
@@ -61,6 +94,11 @@
           </label>
         </div>
       </div>
+      </div>
+
+      <h3 class="obp-subheading">個人情報の自動伏せ字</h3>
+      <label><input type="checkbox" id="obp-pii-mask"> 送信前に電話番号・メールアドレス・郵便番号・○○号室を伏せ字にする（推奨）</label>
+      <p class="obp-pii-note">氏名・住所の番地・生年月日は対象外です。伏せ字は送信用の文字列だけに適用し、レコードの値は変更しません。</p>
     </div>
   </details>
 
