@@ -727,9 +727,22 @@
       typeof opts.deadlineAt === 'number'
         ? opts.deadlineAt
         : Date.now() + TOTAL_DEADLINE_MS;
+    // 軽量モデルがあるなら、主モデルが混雑で粘って期限を使い切らないよう、
+    // 切替先の待ち時間を先に確保する。主モデルの再試行も1回に絞る。
+    // 主モデルには最低30秒を残し、確保できるのが10秒未満なら従来の動作にする。
+    const fallbackModel = pickFallbackModel(primaryModel, []);
+    const reserveMs = fallbackModel
+      ? Math.min(
+          PROXY_TIMEOUT_MS,
+          Math.max(deadlineAt - Date.now() - 30000, 0),
+        )
+      : 0;
+    const reserved = reserveMs >= 10000;
+    const primaryDeadlineAt = reserved ? deadlineAt - reserveMs : deadlineAt;
+    const primaryMaxAttempts = reserved ? 1 : RETRY_MAX_ATTEMPTS;
     let thinkingDropped = false;
 
-    function sendOnce(model, body, maxAttempts, stopRetryFn) {
+    function sendOnce(model, body, maxAttempts, stopRetryFn, phaseDeadlineAt) {
       const url =
         PROXY_POST_PREFIX + stripModelPrefix(model) + ':generateContent';
       // headerのx-goog-api-keyはプロキシ設定側で自動的に付与される。
@@ -747,14 +760,19 @@
             status: status,
           }),
         {
-          deadlineAt: deadlineAt,
+          deadlineAt: phaseDeadlineAt,
           maxAttempts: maxAttempts,
           shouldStopRetry: stopRetryFn,
         },
       );
     }
 
-    async function requestModel(model, maxAttempts, stopRetryFn) {
+    async function requestModel(
+      model,
+      maxAttempts,
+      stopRetryFn,
+      phaseDeadlineAt,
+    ) {
       const bare = stripModelPrefix(model);
       const thinkingConfig = buildThinkingConfig(bare, thinkingMode);
       let res = await sendOnce(
@@ -762,11 +780,12 @@
         applyThinkingConfig(baseBody, thinkingConfig),
         maxAttempts,
         stopRetryFn,
+        phaseDeadlineAt,
       );
       if (
         thinkingConfig &&
         isThinkingConfigError(res.status, safeParseJson(res.body)) &&
-        !(deadlineAt && Date.now() > deadlineAt - PROXY_TIMEOUT_MS)
+        !(phaseDeadlineAt && Date.now() > phaseDeadlineAt - PROXY_TIMEOUT_MS)
       ) {
         // 安全網: このモデルは thinkingConfig を受け付けないため、記録して
         // 外した本文で1回だけ再送する。
@@ -776,7 +795,13 @@
         );
         onProgress({ type: 'thinking_retry', model: bare });
         thinkingDropped = true;
-        res = await sendOnce(model, baseBody, maxAttempts, stopRetryFn);
+        res = await sendOnce(
+          model,
+          baseBody,
+          maxAttempts,
+          stopRetryFn,
+          phaseDeadlineAt,
+        );
       }
       return res;
     }
@@ -792,8 +817,9 @@
 
     const primary = await requestModel(
       primaryModel,
-      RETRY_MAX_ATTEMPTS,
+      primaryMaxAttempts,
       shouldStopRetry,
+      primaryDeadlineAt,
     );
     const result = {
       status: primary.status,
@@ -815,15 +841,15 @@
     if (kind !== 'busy' && kind !== 'timeout') {
       return result;
     }
-    const fallbackModel = pickFallbackModel(primaryModel, []);
-    if (!fallbackModel || Date.now() > deadlineAt - PROXY_TIMEOUT_MS) {
+    // 確保した待ち時間が残っていれば、必ず切替先を試す（最低10秒）。
+    if (!fallbackModel || deadlineAt - Date.now() < 10000) {
       return result;
     }
 
     const bareFallback = stripModelPrefix(fallbackModel);
     onProgress({ type: 'fallback', model: bareFallback, reason: kind });
     // フォールバックは同一モデルでのリトライを行わない（0回）。
-    const fb = await requestModel(bareFallback, 0, null);
+    const fb = await requestModel(bareFallback, 0, null, deadlineAt);
     result.fallbackModel = bareFallback;
     result.fallbackResult = fb;
     result.thinkingDropped = thinkingDropped;
