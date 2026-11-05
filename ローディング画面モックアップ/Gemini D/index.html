@@ -1,0 +1,2433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI文章作成ローディング画面 デザインモックアップ集（Claude / AIイメージ）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Serif+JP:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --claude-bg-ivory: #FAF8F5;
+      --claude-bg-sand: #F3EFEA;
+      --claude-border: #E5E0D8;
+      --claude-terracotta: #D97757;
+      --claude-terracotta-deep: #C45B3A;
+      --claude-terracotta-soft: #F7E6DF;
+      --claude-ink: #1F1E1D;
+      --claude-ink-muted: #6B665E;
+      --claude-dark-bg: #191918;
+      --claude-dark-card: #232220;
+      --claude-dark-border: #35332F;
+      --ui-accent: #D97757;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #F4F2EE;
+      color: #1F1E1D;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* =========================================================
+       上部コントロールバー（モックアップ操作パネル）
+       ========================================================= */
+    .mockup-control-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20000;
+      background: rgba(25, 25, 24, 0.96);
+      backdrop-filter: blur(12px);
+      color: #FAF8F5;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .control-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #D97757, #B85435);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .brand-title h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #FAF8F5;
+      letter-spacing: 0.01em;
+    }
+
+    .view-mode-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-pill-group {
+      display: inline-flex;
+      background: #2A2927;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .ctrl-btn {
+      background: transparent;
+      color: #B8B3A8;
+      border: none;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .ctrl-btn:hover {
+      color: #FAF8F5;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .ctrl-btn.active {
+      background: #D97757;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(217, 119, 87, 0.4);
+    }
+
+    .ctrl-btn.secondary-action {
+      background: #2E2D2A;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #EAE6DF;
+      border-radius: 8px;
+      padding: 6px 12px;
+    }
+
+    .ctrl-btn.secondary-action:hover {
+      background: #3B3935;
+      border-color: #D97757;
+    }
+
+    /* デザイン案セレクタータブ */
+    .design-selector-bar {
+      max-width: 1440px;
+      margin: 10px auto 0;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .design-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .design-tab {
+      background: #262523;
+      color: #C7C2B8;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      padding: 7px 13px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: inherit;
+    }
+
+    .design-tab:hover {
+      background: #32302D;
+      color: #fff;
+    }
+
+    .design-tab.active {
+      background: rgba(217, 119, 87, 0.18);
+      border-color: #D97757;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: inset 0 0 0 1px rgba(217, 119, 87, 0.35);
+    }
+
+    .tab-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* 状態シミュレーター（setSpinnerText連動テスト） */
+    .status-sim-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .status-sim-label {
+      font-size: 11px;
+      color: #9E988E;
+      margin-right: 2px;
+    }
+
+    .sim-chip {
+      background: #252422;
+      color: #BDB7AD;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .sim-chip:hover {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .sim-chip.active {
+      background: #FAF8F5;
+      color: #191918;
+      border-color: #FAF8F5;
+      font-weight: 600;
+    }
+
+    /* =========================================================
+       メインコンテンツ領域：一覧比較モード vs Kintone実画面ライブモード
+       ========================================================= */
+    .workspace-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* --- モード1: ギャラリー比較モード (Grid View) --- */
+    .gallery-view {
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 24px 60px;
+      display: none;
+    }
+
+    .gallery-view.active {
+      display: block;
+    }
+
+    .gallery-intro {
+      background: #FAF8F5;
+      border: 1px solid #E5E0D8;
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .gallery-intro-text h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1F1E1D;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gallery-intro-text p {
+      font-size: 13px;
+      color: #5C574F;
+      line-height: 1.6;
+    }
+
+    .standalone-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .standalone-link {
+      font-size: 12px;
+      text-decoration: none;
+      color: #C45B3A;
+      background: #F7E6DF;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .standalone-link:hover {
+      background: #D97757;
+      color: #fff;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(410px, 1fr));
+      gap: 24px;
+    }
+
+    .gallery-card {
+      background: #FAF8F5;
+      border: 1px solid #E2DDD3;
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 6px 24px rgba(25, 24, 22, 0.06);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .gallery-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 36px rgba(25, 24, 22, 0.12);
+      border-color: #D97757;
+    }
+
+    .gallery-stage {
+      height: 340px;
+      position: relative;
+      overflow: hidden;
+      background: #EAECEF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ギャラリー内のミニKintone背景 */
+    .mini-kintone-bg {
+      position: absolute;
+      inset: 0;
+      padding: 18px;
+      background: #F5F6F8;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .mini-kintone-bar {
+      height: 28px;
+      background: #FFBF00;
+      border-radius: 4px;
+      opacity: 0.7;
+    }
+
+    .mini-kintone-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .mini-kintone-field {
+      background: #fff;
+      border: 1px solid #D8DCE3;
+      border-radius: 4px;
+      height: 44px;
+      flex: 1;
+    }
+
+    .mini-kintone-textarea {
+      background: #fff;
+      border: 1px solid #D8DCE3;
+      border-radius: 4px;
+      flex: 1;
+    }
+
+    .gallery-card-body {
+      padding: 18px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      justify-content: space-between;
+    }
+
+    .gallery-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .gallery-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #F2ECE4;
+      color: #8C4A32;
+    }
+
+    .gallery-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1F1E1D;
+      margin-top: 4px;
+    }
+
+    .gallery-card-desc {
+      font-size: 12.5px;
+      color: #5C574F;
+      line-height: 1.6;
+    }
+
+    .gallery-card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      padding-top: 12px;
+      border-top: 1px solid #EAE5DC;
+    }
+
+    .btn-card-action {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid #DDD7CD;
+      background: #fff;
+      color: #2B2927;
+      transition: all 0.15s;
+      text-align: center;
+      text-decoration: none;
+      font-family: inherit;
+    }
+
+    .btn-card-action:hover {
+      border-color: #D97757;
+      color: #C45B3A;
+    }
+
+    .btn-card-action.primary {
+      background: #1F1E1D;
+      color: #FAF8F5;
+      border-color: #1F1E1D;
+    }
+
+    .btn-card-action.primary:hover {
+      background: #D97757;
+      border-color: #D97757;
+      color: #fff;
+    }
+
+    /* =========================================================
+       モード2: Kintone実画面シミュレーター (Live Preview View)
+       ========================================================= */
+    .live-preview-view {
+      display: none;
+      flex: 1;
+      position: relative;
+      min-height: calc(100vh - 108px);
+      background: #E8EAED;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px;
+    }
+
+    .live-preview-view.active {
+      display: flex;
+    }
+
+    .kintone-viewport-wrapper {
+      width: 100%;
+      max-width: 1180px;
+      background: #F5F5F5;
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      position: relative;
+      min-height: 740px;
+      transition: max-width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      border: 1px solid #D4D7DC;
+    }
+
+    .kintone-viewport-wrapper.mobile-viewport {
+      max-width: 390px;
+      min-height: 760px;
+      border-radius: 32px;
+      border: 8px solid #232220;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    /* Kintone風ヘッダー */
+    .kintone-mock-header {
+      background: #FFBF00;
+      height: 48px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #222;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .kintone-mock-subbar {
+      background: #fff;
+      border-bottom: 1px solid #E3E7E8;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .kintone-app-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .kintone-app-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: #2962FF;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .kintone-action-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .kintone-btn-cancel {
+      padding: 8px 18px;
+      background: #F7F9FA;
+      border: 1px solid #E3E7E8;
+      color: #3498DB;
+      font-size: 13px;
+      border-radius: 3px;
+    }
+
+    .kintone-btn-save {
+      padding: 8px 22px;
+      background: #3498DB;
+      border: 1px solid #3498DB;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: 3px;
+    }
+
+    /* Kintoneフォーム領域 */
+    .kintone-mock-form {
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .kintone-field-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .kintone-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .kintone-field-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .kintone-req {
+      color: #E74C3C;
+    }
+
+    .kintone-input,
+    .kintone-select,
+    .kintone-textarea {
+      background: #fff;
+      border: 1px solid #E3E7E8;
+      box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.04);
+      padding: 10px 12px;
+      font-size: 14px;
+      color: #333;
+      border-radius: 3px;
+      font-family: inherit;
+    }
+
+    .kintone-ai-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      color: #fff;
+      background: linear-gradient(135deg, #D97757 0%, #B85435 100%);
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 3px 10px rgba(217, 119, 87, 0.35);
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .kintone-ai-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(217, 119, 87, 0.45);
+    }
+
+    /* フローティング解説カード（ライブプレビュー右下） */
+    .live-design-info-floating {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 20001;
+      background: rgba(25, 25, 24, 0.94);
+      backdrop-filter: blur(12px);
+      color: #FAF8F5;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 16px 18px;
+      width: 340px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+
+    .live-design-info-floating h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .live-design-info-floating p {
+      font-size: 12px;
+      color: #C7C1B7;
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+
+    .floating-btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* =========================================================
+       共通オーバーレイコンテナ（ライブ表示＆ギャラリー内ステージ共通）
+       ========================================================= */
+    .loading-overlay-stage {
+      position: absolute;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.35s ease;
+    }
+
+    .loading-overlay-stage.hidden-overlay {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner-text-target {
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .spinner-text-target.phrase-fade {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+
+    .stream-sentence-box {
+      width: 100%;
+      margin-top: 8px;
+      padding: 9px 12px;
+      border-radius: 9px;
+      font-family: 'JetBrains Mono', 'Inter', monospace;
+      font-size: 11.5px;
+      line-height: 1.5;
+      text-align: left;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    .stream-sentence-light {
+      background: rgba(217, 119, 87, 0.08);
+      border: 1px solid rgba(217, 119, 87, 0.25);
+      color: #4A453E;
+    }
+    .stream-sentence-dark {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(217, 119, 87, 0.32);
+      color: #EAE4D9;
+    }
+    .stream-cursor {
+      display: inline-block;
+      width: 6px;
+      height: 13px;
+      background: #D97757;
+      margin-left: 3px;
+      vertical-align: middle;
+      animation: streamCursorBlink 0.9s steps(2, start) infinite;
+    }
+    @keyframes streamCursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+
+    /* =========================================================
+       【案A】Claude Editorial Warmth（クロード・エディトリアル・ウォーム）
+       温かみのあるアイボリーペーパー × テラコッタ × 原稿ドラフティング
+       ========================================================= */
+    .theme-claude-warm {
+      background: rgba(34, 31, 27, 0.46);
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+
+    .cw-card {
+      background: #FAF8F5;
+      border: 1px solid #E6E0D5;
+      border-radius: 22px;
+      padding: 32px 36px 28px;
+      width: min(440px, calc(100% - 32px));
+      box-shadow:
+        0 24px 60px rgba(28, 25, 21, 0.22),
+        0 4px 16px rgba(28, 25, 21, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 上部テラコッタの微細な進行グローライン */
+    .cw-top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #EFEAE1;
+      overflow: hidden;
+    }
+
+    .cw-top-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -40%;
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, #D97757, #E5987D, transparent);
+      animation: cwSlideBar 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes cwSlideBar {
+      0% { left: -40%; }
+      100% { left: 100%; }
+    }
+
+    .cw-emblem-wrap {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .cw-halo {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(217, 119, 87, 0.22) 0%, rgba(217, 119, 87, 0) 70%);
+      animation: cwHaloPulse 3s ease-in-out infinite;
+    }
+
+    .cw-ring-subtle {
+      position: absolute;
+      inset: 6px;
+      border-radius: 50%;
+      border: 1px dashed rgba(217, 119, 87, 0.35);
+      animation: cwSlowSpin 18s linear infinite;
+    }
+
+    .cw-starburst-svg {
+      width: 44px;
+      height: 44px;
+      z-index: 2;
+      animation: cwStarBreathe 4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+      filter: drop-shadow(0 4px 12px rgba(217, 119, 87, 0.35));
+    }
+
+    @keyframes cwHaloPulse {
+      0%, 100% { transform: scale(0.92); opacity: 0.7; }
+      50% { transform: scale(1.18); opacity: 1; }
+    }
+
+    @keyframes cwSlowSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes cwStarBreathe {
+      0%, 100% { transform: rotate(0deg) scale(0.95); }
+      50% { transform: rotate(90deg) scale(1.08); }
+    }
+
+    .cw-title {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1F1E1D;
+      letter-spacing: 0.02em;
+      margin-bottom: 6px;
+    }
+
+    .cw-subtitle {
+      font-size: 12.5px;
+      color: #787268;
+      margin-bottom: 18px;
+    }
+
+    /* ミニ原稿タイピング演出ボックス */
+    .cw-manuscript-box {
+      width: 100%;
+      background: #F3EFE8;
+      border: 1px solid #E5DFD3;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .cw-ms-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #8C857B;
+      letter-spacing: 0.04em;
+    }
+
+    .cw-ms-line {
+      height: 7px;
+      border-radius: 999px;
+      background: #E2DCD0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .cw-ms-line.l1 { width: 55%; }
+    .cw-ms-line.l2 { width: 92%; }
+    .cw-ms-line.l3 { width: 78%; }
+
+    .cw-ms-line::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #D97757 0%, #E6A087 60%, #E2DCD0 100%);
+      transform-origin: left;
+      animation: cwLineDraft 2.8s ease-in-out infinite;
+    }
+
+    .cw-ms-line.l2::after { animation-delay: 0.4s; }
+    .cw-ms-line.l3::after { animation-delay: 0.8s; }
+
+    @keyframes cwLineDraft {
+      0% { transform: scaleX(0.1); opacity: 0.5; }
+      50% { transform: scaleX(1); opacity: 1; }
+      100% { transform: scaleX(0.2); opacity: 0.5; }
+    }
+
+    .cw-steps {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #7A746B;
+    }
+
+    .cw-step-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #D97757;
+      animation: cwDotBlink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes cwDotBlink {
+      0%, 100% { opacity: 0.35; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    /* =========================================================
+       【案B】Claude Dark Studio & Artifact（クロード・ダークスタジオ）
+       チャコールオニキス × アンバーテラコッタ × アーティファクト生成UI
+       ========================================================= */
+    .theme-claude-dark {
+      background: rgba(15, 15, 14, 0.64);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+
+    .cd-card {
+      width: min(460px, calc(100% - 32px));
+      background: #1C1B1A;
+      border: 1px solid rgba(217, 119, 87, 0.32);
+      border-radius: 20px;
+      padding: 24px 26px;
+      color: #F4F1EA;
+      box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.55),
+        0 0 40px rgba(217, 119, 87, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .cd-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 14px;
+    }
+
+    .cd-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #E89B7E;
+      letter-spacing: 0.03em;
+    }
+
+    .cd-spark-icon {
+      width: 22px;
+      height: 22px;
+      animation: cwStarBreathe 3.2s ease-in-out infinite;
+    }
+
+    .cd-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #8E8980;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .cd-artifact-stage {
+      background: #141413;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 14px;
+      padding: 16px 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cd-artifact-shimmer {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(110deg, transparent 25%, rgba(217, 119, 87, 0.09) 50%, transparent 75%);
+      background-size: 200% 100%;
+      animation: cdShimmerSweep 2.6s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes cdShimmerSweep {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .cd-doc-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .cd-doc-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .cd-doc-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(217, 119, 87, 0.18);
+      color: #E89B7E;
+      border: 1px solid rgba(217, 119, 87, 0.3);
+      flex-shrink: 0;
+    }
+
+    .cd-doc-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cd-doc-bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #D97757, #F0B29A);
+      border-radius: 999px;
+      animation: cdBarPulse 2.4s ease-in-out infinite;
+    }
+
+    .cd-doc-row:nth-child(2) .cd-doc-bar::after { animation-delay: 0.35s; width: 85%; }
+    .cd-doc-row:nth-child(3) .cd-doc-bar::after { animation-delay: 0.7s; width: 68%; }
+
+    @keyframes cdBarPulse {
+      0%, 100% { opacity: 0.35; transform: scaleX(0.45); transform-origin: left; }
+      50% { opacity: 0.95; transform: scaleX(1); transform-origin: left; }
+    }
+
+    .cd-status-area {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .cd-main-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: #FAF8F5;
+      letter-spacing: 0.02em;
+    }
+
+    .cd-sub-text {
+      font-size: 12px;
+      color: #9A948A;
+    }
+
+    /* =========================================================
+       【案C】Luminous AI Orb & Neural Wave（ルミナスAIオーブ）
+       流体グラデーション球体 × 軌道リング × フロストガラス
+       ========================================================= */
+    .theme-luminous-orb {
+      background: rgba(15, 20, 32, 0.58);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .lo-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 26px;
+      padding: 24px;
+    }
+
+    .lo-orb-stage {
+      position: relative;
+      width: 124px;
+      height: 124px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lo-orb-core {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        #D97757,
+        #EC4899,
+        #8B5CF6,
+        #38BDF8,
+        #F59E0B,
+        #D97757
+      );
+      filter: blur(1px);
+      animation: loOrbRotate 4s linear infinite, loOrbMorph 3.5s ease-in-out infinite;
+      box-shadow:
+        0 0 35px rgba(217, 119, 87, 0.55),
+        0 0 65px rgba(139, 92, 246, 0.4),
+        inset 0 0 18px rgba(255, 255, 255, 0.65);
+      position: relative;
+      z-index: 2;
+    }
+
+    .lo-orb-inner-glass {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.1) 55%, transparent 75%);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .lo-orbit-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 255, 255, 0.22);
+      animation: loOrbitSpin 6s linear infinite;
+    }
+
+    .lo-orbit-ring.r2 {
+      inset: -10px;
+      border-color: rgba(217, 119, 87, 0.3);
+      border-style: dashed;
+      animation-direction: reverse;
+      animation-duration: 10s;
+    }
+
+    .lo-center-spark {
+      position: absolute;
+      z-index: 4;
+      color: #fff;
+      font-size: 28px;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+      animation: cwHaloPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes loOrbRotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes loOrbMorph {
+      0%, 100% { border-radius: 50% 48% 52% 50% / 48% 52% 48% 52%; scale: 0.96; }
+      50% { border-radius: 46% 54% 48% 52% / 52% 46% 54% 48%; scale: 1.06; }
+    }
+
+    @keyframes loOrbitSpin {
+      0% { transform: rotateX(60deg) rotateY(20deg) rotateZ(0deg); }
+      100% { transform: rotateX(60deg) rotateY(20deg) rotateZ(360deg); }
+    }
+
+    .lo-glass-pill {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      backdrop-filter: blur(16px);
+      padding: 16px 28px;
+      border-radius: 999px;
+      color: #fff;
+      text-align: center;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lo-text {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .lo-sub {
+      font-size: 11.5px;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    /* =========================================================
+       【案D】AI Co-Writer Manuscript（AIコーライター・原稿執筆）
+       原稿用紙カード上でAIのペン先がリアルタイムに件名・本文を描くUX案
+       ========================================================= */
+    .theme-manuscript-writer {
+      background: rgba(40, 36, 32, 0.48);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .mw-sheet-card {
+      width: min(440px, calc(100% - 32px));
+      background: #FFFFFF;
+      border-radius: 18px;
+      border: 1px solid #E2DDD5;
+      box-shadow:
+        0 20px 50px rgba(24, 22, 19, 0.22),
+        0 6px 0 #F3EFE8,
+        0 7px 0 #DDD6CA;
+      padding: 26px 28px;
+      position: relative;
+    }
+
+    .mw-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #F0ECE4;
+    }
+
+    .mw-author-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #FDF6F3;
+      border: 1px solid #F3D6C9;
+      color: #C45B3A;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .mw-doc-canvas {
+      background: #FAF8F5;
+      border: 1px solid #EAE4DA;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+      position: relative;
+    }
+
+    .mw-subject-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed #E2DDD3;
+    }
+
+    .mw-label-pill {
+      font-size: 10px;
+      font-weight: 700;
+      background: #2C2A28;
+      color: #fff;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .mw-subject-bar {
+      height: 10px;
+      width: 65%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #D97757 0%, #F0B6A1 50%, #E5E0D6 100%);
+      background-size: 200% 100%;
+      animation: cdShimmerSweep 2s linear infinite;
+    }
+
+    .mw-body-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .mw-line-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mw-bullet {
+      width: 6px;
+      height: 6px;
+      border-radius: 2px;
+      background: #D97757;
+      flex-shrink: 0;
+    }
+
+    .mw-line-fill {
+      height: 8px;
+      border-radius: 4px;
+      background: #E5E0D6;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mw-line-fill.w1 { width: 88%; }
+    .mw-line-fill.w2 { width: 74%; }
+    .mw-line-fill.w3 { width: 60%; }
+
+    .mw-line-fill::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #5C574F, #9E9689);
+      animation: mwTypeLine 3s ease-in-out infinite;
+      transform-origin: left;
+    }
+
+    .mw-line-fill.w2::after { animation-delay: 0.5s; }
+    .mw-line-fill.w3::after { animation-delay: 1s; background: #D97757; }
+
+    @keyframes mwTypeLine {
+      0% { transform: scaleX(0); }
+      55%, 85% { transform: scaleX(1); }
+      100% { transform: scaleX(0); }
+    }
+
+    .mw-status-footer {
+      text-align: center;
+    }
+
+    .mw-main-status {
+      font-size: 15.5px;
+      font-weight: 700;
+      color: #1F1E1D;
+      margin-bottom: 4px;
+    }
+
+    .mw-sub-status {
+      font-size: 12px;
+      color: #787268;
+    }
+
+    /* =========================================================
+       【案E】Minimalist Floating Pill & Shimmer（ミニマル・フローティング・シマー）
+       業務画面を邪魔しないClaude風インライン・シマーカプセル
+       ========================================================= */
+    .theme-minimal-shimmer {
+      background: rgba(250, 248, 245, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .ms-pill-container {
+      background: #1F1E1C;
+      color: #FAF8F5;
+      border: 1px solid rgba(217, 119, 87, 0.45);
+      border-radius: 999px;
+      padding: 14px 26px 14px 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow:
+        0 20px 45px rgba(20, 19, 18, 0.26),
+        0 0 0 6px rgba(217, 119, 87, 0.12);
+      max-width: calc(100% - 32px);
+    }
+
+    .ms-icon-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(217, 119, 87, 0.16);
+      border: 1px solid rgba(217, 119, 87, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ms-text-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ms-shimmer-text {
+      font-size: 15px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #FAF8F5 0%, #E89B7E 40%, #FFFFFF 55%, #FAF8F5 100%);
+      background-size: 200% auto;
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: msTextShimmer 2.4s linear infinite;
+    }
+
+    @keyframes msTextShimmer {
+      0% { background-position: 200% center; }
+      100% { background-position: 0% center; }
+    }
+
+    .ms-meta-text {
+      font-size: 11px;
+      color: #9E988E;
+    }
+
+    .ms-wave-bars {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      margin-left: 6px;
+    }
+
+    .ms-wave-bar {
+      width: 3px;
+      height: 14px;
+      border-radius: 999px;
+      background: #D97757;
+      animation: msWave 1s ease-in-out infinite;
+    }
+
+    .ms-wave-bar:nth-child(2) { animation-delay: 0.15s; height: 20px; }
+    .ms-wave-bar:nth-child(3) { animation-delay: 0.3s; height: 12px; }
+    .ms-wave-bar:nth-child(4) { animation-delay: 0.45s; height: 18px; }
+
+    @keyframes msWave {
+      0%, 100% { transform: scaleY(0.45); opacity: 0.5; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    /* =========================================================
+       【案F】Cosmic Intelligence Veil（コズミック・インテリジェンス — 現行正統進化版）
+       現行のフルスクリーン体験をClaude/次世代AIトーンへ高品位化
+       ========================================================= */
+    .theme-cosmic-intelligence {
+      background: linear-gradient(-45deg, #181524, #2B1E38, #592D36, #B85D43, #242F49);
+      background-size: 400% 400%;
+      animation: ciGradientBG 12s ease infinite;
+      color: #FAF8F5;
+    }
+
+    @keyframes ciGradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .ci-center-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .ci-gyro-container {
+      position: relative;
+      width: 116px;
+      height: 116px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ci-ring-outer {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background: linear-gradient(135deg, #F4A285, rgba(255, 255, 255, 0.08)) border-box;
+      -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: cwSlowSpin 2.4s linear infinite;
+      box-shadow: 0 0 24px rgba(217, 119, 87, 0.35);
+    }
+
+    .ci-ring-inner {
+      position: absolute;
+      inset: 14px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(255, 255, 255, 0.35);
+      animation: cwSlowSpin 6s linear infinite reverse;
+    }
+
+    .ci-star-center {
+      z-index: 5;
+      animation: cwStarBreathe 3s ease-in-out infinite;
+      filter: drop-shadow(0 0 16px rgba(244, 162, 133, 0.85));
+    }
+
+    .ci-title-pill {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      padding: 14px 28px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .ci-main-text {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .ci-sub-text {
+      font-size: 12px;
+      color: rgba(250, 248, 245, 0.76);
+    }
+
+    /* =========================================================
+       【現行】Current Gemini Spinner（比較用ベースライン）
+       ========================================================= */
+    .theme-current-baseline {
+      background: linear-gradient(-45deg, #6a11cb, #2575fc, #f77062, #fe5196);
+      background-size: 400% 400%;
+      animation: ciGradientBG 10s ease infinite;
+      color: white;
+      font-family: sans-serif;
+    }
+
+    .cur-spinner-container {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .cur-spinner-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background: linear-gradient(#fff, rgba(255,255,255,0.2)) border-box;
+      -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: cwSlowSpin 1.5s linear infinite;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+    }
+
+    .cur-spinner-star {
+      font-size: 45px;
+      color: white;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,0.9));
+      animation: cwHaloPulse 2s ease-in-out infinite;
+    }
+
+    .cur-spinner-text {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 30px;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    /* =========================================================
+       コード表示モーダル（desktop.js 組み込み用スニペット）
+       ========================================================= */
+    .code-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 30000;
+      background: rgba(15, 15, 14, 0.72);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .code-modal-backdrop.open {
+      display: flex;
+    }
+
+    .code-modal-card {
+      background: #1C1B1A;
+      color: #FAF8F5;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 18px;
+      width: min(820px, 100%);
+      max-height: 86vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    .code-modal-header {
+      padding: 16px 22px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .code-modal-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .code-modal-body {
+      padding: 18px 22px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      background: #141413;
+      white-space: pre-wrap;
+      color: #E6E1D6;
+    }
+
+    .code-modal-footer {
+      padding: 12px 22px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .gallery-grid {
+        grid-template-columns: 1fr;
+      }
+      .live-design-info-floating {
+        position: static;
+        width: 100%;
+        margin-top: 16px;
+      }
+      .live-preview-view.active {
+        flex-direction: column;
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 上部コントロールパネル -->
+  <header class="mockup-control-bar">
+    <div class="control-top-row">
+      <div class="brand-title">
+        <span class="brand-badge">✦ Claude &amp; AI Inspired</span>
+        <h1>Kintone AI文章作成プラグイン — ローディング画面モックアップ集</h1>
+      </div>
+
+      <div class="view-mode-group">
+        <!-- 表示モード切替 -->
+        <div class="ctrl-pill-group" role="tablist" aria-label="表示モード">
+          <button type="button" class="ctrl-btn active" id="btn-mode-gallery" onclick="switchViewMode('gallery')">
+            ❖ 6案一覧比較ギャラリー
+          </button>
+          <button type="button" class="ctrl-btn" id="btn-mode-live" onclick="switchViewMode('live')">
+            🖥 Kintone実画面プレビュー
+          </button>
+        </div>
+
+        <!-- デバイス幅切替（実画面プレビュー時） -->
+        <div class="ctrl-pill-group" id="device-toggle-group" style="display: none;">
+          <button type="button" class="ctrl-btn active" id="btn-dev-pc" onclick="setDeviceMode('pc')">💻 PC画面</button>
+          <button type="button" class="ctrl-btn" id="btn-dev-mobile" onclick="setDeviceMode('mobile')">📱 モバイル画面</button>
+        </div>
+
+        <!-- オーバーレイON/OFF（実画面プレビュー時） -->
+        <button type="button" class="ctrl-btn secondary-action" id="btn-toggle-overlay" style="display: none;" onclick="toggleLiveOverlay()">
+          👁 ローディング表示 ON/OFF
+        </button>
+
+        <button type="button" class="ctrl-btn secondary-action" onclick="openCodeModal(currentDesignKey)">
+          📋 選択中の実装コードを表示
+        </button>
+      </div>
+    </div>
+
+    <!-- デザイン案切替タブ & ステータステスト -->
+    <div class="design-selector-bar">
+      <div class="design-tabs" id="design-tabs-container">
+        <button type="button" class="design-tab active" data-design="A" onclick="selectDesign('A')">
+          <span class="tab-dot" style="background:#D97757;"></span>
+          案A: Claude Warmth（推奨）
+        </button>
+        <button type="button" class="design-tab" data-design="B" onclick="selectDesign('B')">
+          <span class="tab-dot" style="background:#E89B7E;"></span>
+          案B: Claude Dark Studio
+        </button>
+        <button type="button" class="design-tab" data-design="C" onclick="selectDesign('C')">
+          <span class="tab-dot" style="background:#A855F7;"></span>
+          案C: Luminous AI Orb
+        </button>
+        <button type="button" class="design-tab" data-design="D" onclick="selectDesign('D')">
+          <span class="tab-dot" style="background:#C45B3A;"></span>
+          案D: AI原稿ドラフティング
+        </button>
+        <button type="button" class="design-tab" data-design="E" onclick="selectDesign('E')">
+          <span class="tab-dot" style="background:#F59E0B;"></span>
+          案E: Minimal Shimmer Pill
+        </button>
+        <button type="button" class="design-tab" data-design="F" onclick="selectDesign('F')">
+          <span class="tab-dot" style="background:#6366F1;"></span>
+          案F: Cosmic Veil（現行進化）
+        </button>
+        <button type="button" class="design-tab" data-design="CUR" onclick="selectDesign('CUR')">
+          <span class="tab-dot" style="background:#ec4899;"></span>
+          比較: 現行デザイン
+        </button>
+      </div>
+
+      <!-- setSpinnerText() 状態シミュレーター -->
+      <div class="status-sim-group">
+        <span class="status-sim-label">文言・状態テスト:</span>
+        <button type="button" class="sim-chip active" data-sim="normal" onclick="setSimStatus('normal')">🎲 10単語ランダム</button>
+        <button type="button" class="sim-chip" data-sim="pick" onclick="pickNextRandomNow()">↻ 次の単語</button>
+        <button type="button" class="sim-chip" data-sim="next-sentence" onclick="nextStreamSentenceNow()">💬 次の英文メッセージへ</button>
+        <button type="button" class="sim-chip" data-sim="retry" onclick="setSimStatus('retry', '混雑のため再試行しています…（1/2）')">リトライ中</button>
+        <button type="button" class="sim-chip" data-sim="fallback" onclick="setSimStatus('fallback', '応答に時間がかかったため、軽量モデル（gemini-2.5-flash-lite）で再試行しています…')">軽量モデル切替</button>
+        <button type="button" class="sim-chip" data-sim="adjust" onclick="setSimStatus('adjust', '設定を調整して再送しています…')">設定調整・再送</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace-container">
+    <!-- =========================================================
+         ビュー1: 全6案一覧比較ギャラリー
+         ========================================================= -->
+    <section class="gallery-view active" id="view-gallery">
+      <div class="gallery-intro">
+        <div class="gallery-intro-text">
+          <h2>✦ Claude・次世代AIをイメージしたローディング画面 デザイン案（全6案＋現行比較）</h2>
+          <p>
+            通常時は <code>Thinking...</code> / <code>Pondering...</code> / <code>Musing...</code> / <code>Cooking...</code> / <code>Baking...</code> / <code>Crafting...</code> / <code>Computing...</code> / <code>Reticulating...</code> / <code>Noodling...</code> / <code>Clauding...</code> の10単語をランダムに切り替えつつ、生成中に表示される文章としてご指定の5つの英文メッセージ（KitKat Chocolat Orange / Claude, ChatGPT, or Gemini / Dog or Cat person / Strawberry Pon de Ring / "This Is Me / The Greatest Show"）がタイピング表示されます。<br>
+            上部バーの「💬 次の英文メッセージへ」ボタンで5つの英文を順番に切り替えたり、リトライ・フォールバック時の表示もテストできます。
+          </p>
+        </div>
+        <div class="standalone-links">
+          <a class="standalone-link" href="mockup-a-claude-warm.html" target="_blank">案A 単体ページ ↗</a>
+          <a class="standalone-link" href="mockup-b-claude-dark-artifact.html" target="_blank">案B 単体ページ ↗</a>
+          <a class="standalone-link" href="mockup-c-luminous-orb.html" target="_blank">案C 単体ページ ↗</a>
+          <a class="standalone-link" href="mockup-d-manuscript-writer.html" target="_blank">案D 単体ページ ↗</a>
+          <a class="standalone-link" href="mockup-e-minimal-shimmer.html" target="_blank">案E 単体ページ ↗</a>
+          <a class="standalone-link" href="mockup-f-cosmic-intelligence.html" target="_blank">案F 単体ページ ↗</a>
+        </div>
+      </div>
+
+      <div class="gallery-grid" id="gallery-grid-container">
+        <!-- JSで全カードをレンダリング -->
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ビュー2: Kintone実画面ライブプレビュー
+         ========================================================= -->
+    <section class="live-preview-view" id="view-live">
+      <div class="kintone-viewport-wrapper" id="kintone-viewport">
+        <div class="kintone-mock-header">
+          <span>☁ kintone — マンション管理組合 意見書・業務文書アプリ</span>
+          <span style="font-size:12px; font-weight:500;">ログイン中: 管理組合 太郎</span>
+        </div>
+
+        <div class="kintone-mock-subbar">
+          <div class="kintone-app-title">
+            <span class="kintone-app-icon">📝</span>
+            <span>意見書・文書起案レコードの編集</span>
+          </div>
+          <div class="kintone-action-btns">
+            <button type="button" class="kintone-btn-cancel">キャンセル</button>
+            <button type="button" class="kintone-btn-save">保存</button>
+          </div>
+        </div>
+
+        <div class="kintone-mock-form">
+          <div class="kintone-field-row">
+            <div class="kintone-field-group" style="flex: 2; min-width: 280px;">
+              <label class="kintone-field-label">AIへの指示・メモ <span class="kintone-req">*</span></label>
+              <textarea class="kintone-textarea" rows="3" readonly>駐輪場のラック老朽化について。上段ラックが重くて高齢者が使いづらいため、次期総会でスライド式ラックへの更新を提案したい。</textarea>
+            </div>
+            <div class="kintone-field-group" style="min-width: 180px;">
+              <label class="kintone-field-label">文字数の目安</label>
+              <select class="kintone-select">
+                <option>400字程度（推奨）</option>
+                <option>200字程度</option>
+                <option>600字程度</option>
+              </select>
+            </div>
+            <div class="kintone-field-group">
+              <button type="button" class="kintone-ai-btn" onclick="triggerSimulatedGeneration()">
+                ✦ AIで件名・本文を作成（3秒シミュレーション）
+              </button>
+            </div>
+          </div>
+
+          <div class="kintone-field-group" style="max-width: 520px;">
+            <label class="kintone-field-label">件名</label>
+            <input type="text" class="kintone-input" value="駐輪場ラックのスライド式への更新提案について" readonly />
+          </div>
+
+          <div class="kintone-field-group">
+            <label class="kintone-field-label">本文（意見内容・起案文書）</label>
+            <textarea class="kintone-textarea" rows="8" readonly>■ 現状の課題
+・現在設置されている二段式駐輪場の上段ラックは昇降時の負荷が大きく、高齢の居住者や子どもにとって利用しづらい状況となっています。
+・経年による部品の摩耗も見られ、安全面での懸念が生じています。
+
+■ 改善の提案
+・次期定期総会において、軽い力で操作できるスライド式ラックへの更新議案を上程することを提案いたします。
+・まずは管理会社を通じた複数業者からの見積取得および現地調査の実施をお願いいたします。</textarea>
+          </div>
+        </div>
+
+        <!-- ライブローディングオーバーレイ描画領域 -->
+        <div id="live-overlay-mount" class="loading-overlay-stage"></div>
+      </div>
+
+      <!-- 右下フローティング情報パネル -->
+      <aside class="live-design-info-floating" id="live-info-panel">
+        <h3>
+          <span id="live-info-title">案A: Claude Editorial Warmth</span>
+          <span class="gallery-tag" id="live-info-tag">Claude王道</span>
+        </h3>
+        <p id="live-info-desc"></p>
+        <div class="floating-btn-row">
+          <button type="button" class="btn-card-action" onclick="triggerSimulatedGeneration()">▶ 3秒生成デモ</button>
+          <button type="button" class="btn-card-action primary" onclick="openCodeModal(currentDesignKey)">📋 コード取得</button>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <!-- コード表示モーダル -->
+  <div class="code-modal-backdrop" id="code-modal" onclick="if(event.target===this)closeCodeModal()">
+    <div class="code-modal-card">
+      <div class="code-modal-header">
+        <h3 id="code-modal-title">desktop.js 組み込み用コード</h3>
+        <button type="button" class="ctrl-btn" onclick="closeCodeModal()">✕ 閉じる</button>
+      </div>
+      <pre class="code-modal-body" id="code-modal-content"></pre>
+      <div class="code-modal-footer">
+        <button type="button" class="ctrl-btn secondary-action" onclick="closeCodeModal()">キャンセル</button>
+        <button type="button" class="ctrl-btn active" id="btn-copy-code" onclick="copyCurrentCode()">📋 クリップボードにコピー</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Claude風の12光線オーガニック・スターバーストSVG
+    const CLAUDE_STARBURST_SVG = `
+      <svg class="cw-starburst-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#D97757" stroke-linecap="round">
+          <line x1="32" y1="6"  x2="32" y2="58" stroke-width="4.2"/>
+          <line x1="6"  y1="32" x2="58" y2="32" stroke-width="4.2"/>
+          <line x1="13.6" y1="13.6" x2="50.4" y2="50.4" stroke-width="3.8"/>
+          <line x1="50.4" y1="13.6" x2="13.6" y2="50.4" stroke-width="3.8"/>
+          <line x1="19" y1="9.5" x2="45" y2="54.5" stroke-width="3.2" opacity="0.85"/>
+          <line x1="9.5" y1="19" x2="54.5" y2="45" stroke-width="3.2" opacity="0.85"/>
+          <line x1="45" y1="9.5" x2="19" y2="54.5" stroke-width="3.2" opacity="0.85"/>
+          <line x1="54.5" y1="19" x2="9.5" y2="45" stroke-width="3.2" opacity="0.85"/>
+        </g>
+        <circle cx="32" cy="32" r="6" fill="#D97757"/>
+        <circle cx="32" cy="32" r="2.5" fill="#FAF8F5"/>
+      </svg>
+    `;
+
+    const DESIGNS = {
+      A: {
+        key: 'A',
+        name: '案A: Claude Editorial Warmth',
+        badge: 'Claude王道・温もり',
+        standaloneFile: 'mockup-a-claude-warm.html',
+        themeClass: 'theme-claude-warm',
+        desc: 'Claudeを象徴する温かみのあるアイボリー紙面（#FAF8F5）とテラコッタオレンジ（#D97757）、知的な明朝見出しを組み合わせたデザイン。カード内で原稿の行が紡ぎ出されるアニメーションにより、待ち時間を心地よい「執筆時間」に変えます。',
+        renderHTML: (statusText) => `
+          <div class="cw-card">
+            <div class="cw-top-bar"></div>
+            <div class="cw-emblem-wrap">
+              <div class="cw-halo"></div>
+              <div class="cw-ring-subtle"></div>
+              ${CLAUDE_STARBURST_SVG}
+            </div>
+            <div class="cw-title spinner-text-target">${statusText}</div>
+            <div class="cw-subtitle">文章を作成中 — メモの意図を汲み取り、丁寧な文章へ仕立てています</div>
+            <div class="cw-manuscript-box">
+              <div class="cw-ms-header">
+                <span>✦ AI WRITING</span>
+                <span style="color:#D97757;">● 文章を作成中</span>
+              </div>
+              <div class="cw-ms-line l1"></div>
+              <div class="cw-ms-line l2"></div>
+              <div class="cw-ms-line l3"></div>
+              <div class="stream-sentence-box stream-sentence-light">
+                <span><span class="stream-text-target">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></span>
+              </div>
+            </div>
+            <div class="cw-steps">
+              <span class="cw-step-dot"></span>
+              <span>文脈解析・構成案の作成・推敲を自動実行中</span>
+            </div>
+          </div>
+        `
+      },
+      B: {
+        key: 'B',
+        name: '案B: Claude Dark Studio & Artifact',
+        badge: 'ダーク・プロ仕様',
+        standaloneFile: 'mockup-b-claude-dark-artifact.html',
+        themeClass: 'theme-claude-dark',
+        desc: 'Claudeのダークテーマと「Artifacts（文書生成ウィンドウ）」を着想源にした、チャコールオニキス×アンバーテラコッタの洗練されたスタジオUI。構造化された「件名」「見出し」「本文」タグが生成される様子をリアルタイムに表現します。',
+        renderHTML: (statusText) => `
+          <div class="cd-card">
+            <div class="cd-header">
+              <div class="cd-badge">
+                <svg class="cd-spark-icon" viewBox="0 0 64 64" fill="none">
+                  <g stroke="#D97757" stroke-linecap="round" stroke-width="5">
+                    <line x1="32" y1="6" x2="32" y2="58"/><line x1="6" y1="32" x2="58" y2="32"/>
+                    <line x1="14" y1="14" x2="50" y2="50"/><line x1="50" y1="14" x2="14" y2="50"/>
+                  </g>
+                </svg>
+                <span>CLAUDE / AI ARTIFACT COMPOSER</span>
+              </div>
+              <span class="cd-timer">● 文章を作成中</span>
+            </div>
+            <div class="cd-artifact-stage">
+              <div class="cd-artifact-shimmer"></div>
+              <div class="cd-doc-row">
+                <span class="cd-doc-tag">件名</span>
+                <div class="cd-doc-bar"></div>
+              </div>
+              <div class="cd-doc-row">
+                <span class="cd-doc-tag">構成</span>
+                <div class="cd-doc-bar"></div>
+              </div>
+              <div class="cd-doc-row">
+                <span class="cd-doc-tag">本文</span>
+                <div class="cd-doc-bar"></div>
+              </div>
+              <div class="stream-sentence-box stream-sentence-dark">
+                <span><span class="stream-text-target">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></span>
+              </div>
+            </div>
+            <div class="cd-status-area">
+              <div class="cd-main-text spinner-text-target">${statusText}</div>
+              <div class="cd-sub-text">文章を作成中 — 適切なトーン＆マナーで読みやすい構成に整えています</div>
+            </div>
+          </div>
+        `
+      },
+      C: {
+        key: 'C',
+        name: '案C: Luminous AI Orb & Neural Wave',
+        badge: '次世代AIオーブ',
+        standaloneFile: 'mockup-c-luminous-orb.html',
+        themeClass: 'theme-luminous-orb',
+        desc: '有機的に形を変えながら輝くマルチカラーAIオーブ（テラコッタ×バイオレット×スカイブルー）と立体軌道リングを組み合わせた、次世代AIアシスタントらしい象徴的なビジュアル。背景のすりガラス効果と美しく調和します。',
+        renderHTML: (statusText) => `
+          <div class="lo-wrapper">
+            <div class="lo-orb-stage">
+              <div class="lo-orbit-ring"></div>
+              <div class="lo-orbit-ring r2"></div>
+              <div class="lo-orb-core"></div>
+              <div class="lo-orb-inner-glass"></div>
+              <div class="lo-center-spark">✦</div>
+            </div>
+            <div class="lo-glass-pill" style="border-radius: 20px; max-width: 420px;">
+              <div class="lo-text spinner-text-target">${statusText}</div>
+              <div class="lo-sub">✦ 文章を作成中</div>
+              <div class="stream-sentence-box stream-sentence-dark" style="margin-top:6px;">
+                <span><span class="stream-text-target">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></span>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      D: {
+        key: 'D',
+        name: '案D: AI Co-Writer Manuscript',
+        badge: 'UX重視・原稿用紙',
+        standaloneFile: 'mockup-d-manuscript-writer.html',
+        themeClass: 'theme-manuscript-writer',
+        desc: '「件名」と「本文（見出し＋箇条書き）」の原稿シートが目の前で1行ずつ書き上がっていく様子を直感的に見せる、文章作成プラグインならではのデザイン。利用者に「何を作ってくれているか」が最も伝わりやすい案です。',
+        renderHTML: (statusText) => `
+          <div class="mw-sheet-card">
+            <div class="mw-top-row">
+              <span class="mw-author-chip">✳ 文章を作成中</span>
+              <span style="font-size:11px; color:#8C857B; font-weight:600;">文章を作成中</span>
+            </div>
+            <div class="mw-doc-canvas">
+              <div class="mw-subject-box">
+                <span class="mw-label-pill">件名</span>
+                <div class="mw-subject-bar"></div>
+              </div>
+              <div class="mw-body-lines">
+                <div class="mw-line-row"><span class="mw-bullet"></span><div class="mw-line-fill w1"></div></div>
+                <div class="mw-line-row"><span class="mw-bullet"></span><div class="mw-line-fill w2"></div></div>
+                <div class="mw-line-row"><span class="mw-bullet"></span><div class="mw-line-fill w3"></div></div>
+              </div>
+              <div class="stream-sentence-box stream-sentence-light">
+                <span><span class="stream-text-target">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></span>
+              </div>
+            </div>
+            <div class="mw-status-footer">
+              <div class="mw-main-status spinner-text-target">${statusText}</div>
+              <div class="mw-sub-status">文章を作成中 — 入力されたメモから件名と本文を組み立てています</div>
+            </div>
+          </div>
+        `
+      },
+      E: {
+        key: 'E',
+        name: '案E: Minimalist Floating Pill & Shimmer',
+        badge: 'ミニマル・非侵襲',
+        standaloneFile: 'mockup-e-minimal-shimmer.html',
+        themeClass: 'theme-minimal-shimmer',
+        desc: 'Kintoneの画面全体を大きく隠さず、柔らかいアイボリーベールの上にフローティング・カプセルだけを浮かべるミニマルデザイン。Claudeの「Thinking...」表示のように文字自体が上品に輝くテキストシマーを採用しています。',
+        renderHTML: (statusText) => `
+          <div class="ms-pill-container">
+            <div class="ms-icon-badge">
+              <svg width="22" height="22" viewBox="0 0 64 64" fill="none" style="animation: cwSlowSpin 6s linear infinite;">
+                <g stroke="#D97757" stroke-linecap="round" stroke-width="5">
+                  <line x1="32" y1="6" x2="32" y2="58"/><line x1="6" y1="32" x2="58" y2="32"/>
+                  <line x1="14" y1="14" x2="50" y2="50"/><line x1="50" y1="14" x2="14" y2="50"/>
+                </g>
+              </svg>
+            </div>
+            <div class="ms-text-col" style="max-width: 320px;">
+              <div class="ms-shimmer-text spinner-text-target">${statusText}</div>
+              <div class="ms-meta-text">✦ <span class="stream-text-target" style="color:#E89B7E;">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></div>
+            </div>
+            <div class="ms-wave-bars">
+              <span class="ms-wave-bar"></span>
+              <span class="ms-wave-bar"></span>
+              <span class="ms-wave-bar"></span>
+              <span class="ms-wave-bar"></span>
+            </div>
+          </div>
+        `
+      },
+      F: {
+        key: 'F',
+        name: '案F: Cosmic Intelligence Veil（現行進化）',
+        badge: 'フルスクリーン進化',
+        standaloneFile: 'mockup-f-cosmic-intelligence.html',
+        themeClass: 'theme-cosmic-intelligence',
+        desc: '現行プラグインの「全画面グラデーション＋回転リング＋スター」のワクワク感を継承しつつ、彩度を抑えたディープインディゴ〜テラコッタの気品ある配色と二重ジャイロリング、グラスモーフィズム枠へブラッシュアップした正統進化版です。',
+        renderHTML: (statusText) => `
+          <div class="ci-center-group">
+            <div class="ci-gyro-container">
+              <div class="ci-ring-outer"></div>
+              <div class="ci-ring-inner"></div>
+              <div class="ci-star-center">
+                <svg width="46" height="46" viewBox="0 0 64 64" fill="none">
+                  <path d="M32 4L37.5 26.5L60 32L37.5 37.5L32 60L26.5 37.5L4 32L26.5 26.5L32 4Z" fill="#FAF8F5"/>
+                  <circle cx="32" cy="32" r="5" fill="#D97757"/>
+                </svg>
+              </div>
+            </div>
+            <div class="ci-title-pill" style="max-width: 420px;">
+              <div class="ci-main-text spinner-text-target">${statusText}</div>
+              <div class="ci-sub-text">✦ 文章を作成中</div>
+              <div class="stream-sentence-box stream-sentence-dark">
+                <span><span class="stream-text-target">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></span>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      CUR: {
+        key: 'CUR',
+        name: '比較用: 現行デザイン（Current Spinner）',
+        badge: '現行ベースライン',
+        standaloneFile: '',
+        themeClass: 'theme-current-baseline',
+        desc: '現在 desktop.js に実装されているローディング画面です。鮮やかな4色グラデーション背景とシンプルな✦スピナーで構成されています。各デザイン案との比較基準としてご覧ください。',
+        renderHTML: (statusText) => `
+          <div class="cur-spinner-container">
+            <div class="cur-spinner-ring"></div>
+            <div class="cur-spinner-star">✦</div>
+          </div>
+          <div class="cur-spinner-text spinner-text-target">${statusText}</div>
+        `
+      }
+    };
+
+    const RANDOM_WORDS = [
+      'Thinking...',
+      'Pondering...',
+      'Musing...',
+      'Cooking...',
+      'Baking...',
+      'Crafting...',
+      'Computing...',
+      'Reticulating...',
+      'Noodling...',
+      'Clauding...'
+    ];
+
+    // 生成中に表示される5つの英訳メッセージ
+    const STREAM_SENTENCES = [
+      'Chocolat Orange KitKat is seriously delicious~',
+      'Between Claude, ChatGPT, and Gemini, which one do you like best?',
+      'Are you a dog person or a cat person?',
+      'I\'m craving a strawberry Pon de Ring donut.',
+      'My favorite song is "This Is the Greatest Show."'
+    ];
+    let currentSentenceIdx = 0;
+    let currentCharIdx = 0;
+    let streamTypingTimer = null;
+    let lastWordIndex = -1;
+    let normalCycleTimer = null;
+    let currentSimMode = 'normal';
+    let currentDesignKey = 'A';
+    let currentViewMode = 'gallery';
+    let currentStatusText = 'Thinking...';
+    let liveOverlayVisible = true;
+
+    function pickRandomWord() {
+      let nextIdx;
+      do {
+        nextIdx = Math.floor(Math.random() * RANDOM_WORDS.length);
+      } while (nextIdx === lastWordIndex && RANDOM_WORDS.length > 1);
+      lastWordIndex = nextIdx;
+      return RANDOM_WORDS[nextIdx];
+    }
+
+    function renderGallery() {
+      const grid = document.getElementById('gallery-grid-container');
+      grid.innerHTML = '';
+      Object.values(DESIGNS).forEach((d) => {
+        const card = document.createElement('article');
+        card.className = 'gallery-card';
+        card.innerHTML = `
+          <div class="gallery-stage">
+            <div class="mini-kintone-bg">
+              <div class="mini-kintone-bar"></div>
+              <div class="mini-kintone-row">
+                <div class="mini-kintone-field"></div>
+                <div class="mini-kintone-field"></div>
+              </div>
+              <div class="mini-kintone-textarea"></div>
+            </div>
+            <div class="loading-overlay-stage ${d.themeClass}">
+              ${d.renderHTML(currentStatusText)}
+            </div>
+          </div>
+          <div class="gallery-card-body">
+            <div>
+              <div class="gallery-card-meta">
+                <span class="gallery-tag">${d.badge}</span>
+                ${d.standaloneFile ? `<a href="${d.standaloneFile}" target="_blank" style="font-size:11.5px; color:#C45B3A; text-decoration:none; font-weight:600;">単体ファイルで開く ↗</a>` : ''}
+              </div>
+              <h3 class="gallery-card-title">${d.name}</h3>
+              <p class="gallery-card-desc">${d.desc}</p>
+            </div>
+            <div class="gallery-card-actions">
+              <button type="button" class="btn-card-action primary" onclick="previewInKintone('${d.key}')">
+                🖥 Kintone実画面でプレビュー
+              </button>
+              <button type="button" class="btn-card-action" onclick="openCodeModal('${d.key}')">
+                📋 実装コード
+              </button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function updateLiveView() {
+      const d = DESIGNS[currentDesignKey] || DESIGNS.A;
+      const mount = document.getElementById('live-overlay-mount');
+      mount.className = 'loading-overlay-stage ' + d.themeClass + (liveOverlayVisible ? '' : ' hidden-overlay');
+      mount.innerHTML = d.renderHTML(currentStatusText);
+
+      document.getElementById('live-info-title').textContent = d.name;
+      document.getElementById('live-info-tag').textContent = d.badge;
+      document.getElementById('live-info-desc').textContent = d.desc;
+
+      document.querySelectorAll('.design-tab').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-design') === currentDesignKey);
+      });
+    }
+
+    function selectDesign(key) {
+      currentDesignKey = key;
+      liveOverlayVisible = true;
+      updateLiveView();
+      if (currentViewMode === 'gallery') {
+        switchViewMode('live');
+      }
+    }
+
+    function previewInKintone(key) {
+      currentDesignKey = key;
+      liveOverlayVisible = true;
+      switchViewMode('live');
+      updateLiveView();
+    }
+
+    function switchViewMode(mode) {
+      currentViewMode = mode;
+      document.getElementById('view-gallery').classList.toggle('active', mode === 'gallery');
+      document.getElementById('view-live').classList.toggle('active', mode === 'live');
+      document.getElementById('btn-mode-gallery').classList.toggle('active', mode === 'gallery');
+      document.getElementById('btn-mode-live').classList.toggle('active', mode === 'live');
+      document.getElementById('device-toggle-group').style.display = mode === 'live' ? 'inline-flex' : 'none';
+      document.getElementById('btn-toggle-overlay').style.display = mode === 'live' ? 'inline-flex' : 'none';
+      updateLiveView();
+    }
+
+    function setDeviceMode(device) {
+      const vp = document.getElementById('kintone-viewport');
+      vp.classList.toggle('mobile-viewport', device === 'mobile');
+      document.getElementById('btn-dev-pc').classList.toggle('active', device === 'pc');
+      document.getElementById('btn-dev-mobile').classList.toggle('active', device === 'mobile');
+    }
+
+    function toggleLiveOverlay() {
+      liveOverlayVisible = !liveOverlayVisible;
+      updateLiveView();
+    }
+
+    function applyStatusTextToDOM(text, animate = true) {
+      currentStatusText = text;
+      document.querySelectorAll('.spinner-text-target').forEach((el) => {
+        if (!animate) {
+          el.textContent = text;
+          return;
+        }
+        el.classList.add('phrase-fade');
+        setTimeout(() => {
+          el.textContent = text;
+          el.classList.remove('phrase-fade');
+        }, 180);
+      });
+    }
+
+    function startNormalPhraseCycle() {
+      stopNormalPhraseCycle();
+      applyStatusTextToDOM(pickRandomWord(), false);
+      normalCycleTimer = setInterval(() => {
+        if (currentSimMode !== 'normal') return;
+        applyStatusTextToDOM(pickRandomWord(), true);
+      }, 2400);
+    }
+
+    function stopNormalPhraseCycle() {
+      if (normalCycleTimer) {
+        clearInterval(normalCycleTimer);
+        normalCycleTimer = null;
+      }
+    }
+
+    function pickNextRandomNow() {
+      currentSimMode = 'normal';
+      document.querySelectorAll('.sim-chip').forEach((chip) => {
+        chip.classList.toggle('active', chip.getAttribute('data-sim') === 'normal');
+      });
+      applyStatusTextToDOM(pickRandomWord(), true);
+    }
+
+    function setSimStatus(simKey, text) {
+      currentSimMode = simKey;
+      document.querySelectorAll('.sim-chip').forEach((chip) => {
+        chip.classList.toggle('active', chip.getAttribute('data-sim') === simKey);
+      });
+      if (simKey === 'normal') {
+        startNormalPhraseCycle();
+      } else {
+        stopNormalPhraseCycle();
+        applyStatusTextToDOM(text, true);
+      }
+    }
+
+    let simTimer = null;
+    function triggerSimulatedGeneration() {
+      if (simTimer) clearTimeout(simTimer);
+      liveOverlayVisible = true;
+      setSimStatus('normal');
+      updateLiveView();
+      simTimer = setTimeout(() => {
+        applyStatusTextToDOM(pickRandomWord(), true);
+      }, 1200);
+      setTimeout(() => {
+        liveOverlayVisible = false;
+        updateLiveView();
+        setSimStatus('normal');
+      }, 3200);
+    }
+
+    function startStreamTyping() {
+      if (streamTypingTimer) clearInterval(streamTypingTimer);
+      currentCharIdx = 0;
+      streamTypingTimer = setInterval(() => {
+        const fullText = STREAM_SENTENCES[currentSentenceIdx];
+        currentCharIdx++;
+        const slice = fullText.slice(0, currentCharIdx);
+        document.querySelectorAll('.stream-text-target').forEach((el) => {
+          el.textContent = slice;
+        });
+        if (currentCharIdx >= fullText.length + 28) {
+          currentCharIdx = 0;
+          currentSentenceIdx = (currentSentenceIdx + 1) % STREAM_SENTENCES.length;
+        }
+      }, 45);
+    }
+
+    function nextStreamSentenceNow() {
+      currentSentenceIdx = (currentSentenceIdx + 1) % STREAM_SENTENCES.length;
+      currentCharIdx = STREAM_SENTENCES[currentSentenceIdx].length;
+      document.querySelectorAll('.stream-text-target').forEach((el) => {
+        el.textContent = STREAM_SENTENCES[currentSentenceIdx];
+      });
+    }
+
+    function buildIntegrationSnippet(key) {
+      const d = DESIGNS[key] || DESIGNS.A;
+      const htmlInner = d.renderHTML('Thinking...')
+        .replace('spinner-text-target', 'spinner-text-target" id="kintone-spinner-text')
+        .trim();
+      return `/* =========================================================
+ * ${d.name}
+ * desktop.js の LOADING_CSS / showSpinner() 差し替え用スニペット
+ * 10単語のランダム表示 ＋ 5つの英文メッセージのストリーミング表示に対応
+ * ========================================================= */
+
+const CLAUDE_THINKING_WORDS = [
+  'Thinking...', 'Pondering...', 'Musing...', 'Cooking...', 'Baking...',
+  'Crafting...', 'Computing...', 'Reticulating...', 'Noodling...', 'Clauding...'
+];
+const STREAM_SENTENCES = [
+  'Chocolat Orange KitKat is seriously delicious~',
+  'Between Claude, ChatGPT, and Gemini, which one do you like best?',
+  'Are you a dog person or a cat person?',
+  'I\'m craving a strawberry Pon de Ring donut.',
+  'My favorite song is "This Is the Greatest Show."'
+];
+let spinnerPhraseTimer = null;
+
+function showSpinner() {
+  if (document.getElementById('kintone-spinner-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'kintone-spinner-overlay';
+  overlay.className = 'loading-overlay-stage ${d.themeClass}';
+  overlay.innerHTML = \`
+${htmlInner}
+  \`;
+  document.body.appendChild(overlay);
+
+  let lastIdx = -1;
+  const pickWord = () => {
+    let next;
+    do {
+      next = Math.floor(Math.random() * CLAUDE_THINKING_WORDS.length);
+    } while (next === lastIdx);
+    lastIdx = next;
+    return CLAUDE_THINKING_WORDS[next];
+  };
+
+  const textEl = document.getElementById('kintone-spinner-text');
+  if (textEl) textEl.innerText = pickWord();
+
+  spinnerPhraseTimer = setInterval(() => {
+    const el = document.getElementById('kintone-spinner-text');
+    if (!el) {
+      clearInterval(spinnerPhraseTimer);
+      return;
+    }
+    if (CLAUDE_THINKING_WORDS.indexOf(el.innerText) !== -1) {
+      el.innerText = pickWord();
+    }
+  }, 2400);
+}`;
+    }
+
+    function openCodeModal(key) {
+      const d = DESIGNS[key] || DESIGNS.A;
+      document.getElementById('code-modal-title').textContent = `${d.name} — 実装コードスニペット`;
+      document.getElementById('code-modal-content').textContent = buildIntegrationSnippet(key);
+      document.getElementById('code-modal').classList.add('open');
+    }
+
+    function closeCodeModal() {
+      document.getElementById('code-modal').classList.remove('open');
+    }
+
+    function copyCurrentCode() {
+      const code = document.getElementById('code-modal-content').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = document.getElementById('btn-copy-code');
+        const orig = btn.textContent;
+        btn.textContent = '✓ コピーしました！';
+        setTimeout(() => { btn.textContent = orig; }, 1800);
+      });
+    }
+
+    // 初期描画
+    renderGallery();
+    updateLiveView();
+    startNormalPhraseCycle();
+    startStreamTyping();
+  </script>
+</body>
+</html>

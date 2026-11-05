@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI文章作成 ローディング画面 モックアップ</title>
+<style>
+  :root { --ctl-bg:#1f1e1d; --ctl-fg:#f0eee6; --accent:#d97757; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; background:#111; color:var(--ctl-fg); display:flex; flex-direction:column; }
+
+  /* ---------- コントロールバー（モックアップ専用） ---------- */
+  .ctl { background:var(--ctl-bg); padding:10px 14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid #3a3836; font-size:13px; z-index:10000; }
+  .ctl b { color:#9a968c; font-weight:600; margin-right:2px; }
+  .ctl button { background:#2b2a28; color:var(--ctl-fg); border:1px solid #4a4744; border-radius:8px; padding:6px 12px; cursor:pointer; font:inherit; }
+  .ctl button:hover { border-color:var(--accent); }
+  .ctl button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .ctl .sep { width:1px; height:22px; background:#3a3836; margin:0 6px; }
+
+  /* ---------- ステージ（本番では画面全体 position:fixed のオーバーレイ） ---------- */
+  .stage-wrap { flex:1; display:flex; justify-content:center; align-items:stretch; background:#0b0b0b; min-height:0; }
+  .stage { position:relative; width:100%; overflow:hidden; transition:width .3s; }
+  .stage.mobile { width:390px; max-width:100%; border-left:1px solid #333; border-right:1px solid #333; }
+  .ov { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; }
+  .ov.show { display:flex; }
+  iframe.ov.gm { border:0; width:100%; height:100%; padding:0; }
+  iframe.ov.gm.show { display:block; }
+  .msg { min-height:1.6em; transition:opacity .35s; }
+  .msg.fade { opacity:0; }
+  .sub { font-size:13px; opacity:.65; margin-top:10px; font-variant-numeric:tabular-nums; }
+  .cancel { margin-top:28px; background:transparent; border:1px solid currentColor; color:inherit; opacity:.6; border-radius:999px; padding:7px 20px; font:inherit; font-size:13px; cursor:pointer; }
+  .cancel:hover { opacity:1; }
+
+  /* =========================================================
+     案A: Claude風（クリーム地 + テラコッタのスパーク）
+     ========================================================= */
+  #dA { background:#faf9f5; color:#3d3929; font-family:"Hiragino Mincho ProN","Noto Serif JP",Georgia,serif; }
+  #dA .spark { width:72px; height:72px; animation:aSpin 6s linear infinite; }
+  #dA .spark path { fill:#d97757; transform-origin:50% 50%; animation:aBreath 2.4s ease-in-out infinite; }
+  #dA .spark path:nth-child(2n) { animation-delay:-.6s; }
+  #dA .spark path:nth-child(3n) { animation-delay:-1.2s; }
+  @keyframes aSpin { to { transform:rotate(360deg); } }
+  @keyframes aBreath { 0%,100% { transform:scale(.82); opacity:.75; } 50% { transform:scale(1.08); opacity:1; } }
+  #dA .msg { margin-top:26px; font-size:22px; letter-spacing:.04em; }
+  #dA .msg::after { content:""; display:inline-block; width:1.4em; text-align:left; animation:dots 1.6s steps(4,end) infinite; }
+  #dA .sub { font-family:-apple-system,"Hiragino Sans",sans-serif; color:#8a8573; }
+  #dA .cancel { color:#6b6654; }
+
+  /* =========================================================
+     案B: 思考中シマー（ダーク + 文字が光で流れる）
+     ========================================================= */
+  #dB { background:#262624; color:#e8e6dc; }
+  #dB .think { display:flex; align-items:center; gap:12px; font-size:20px; }
+  #dB .think svg { width:26px; height:26px; animation:aSpin 4s linear infinite; }
+  #dB .think svg path { fill:#d97757; }
+  #dB .shimmer { background:linear-gradient(100deg,#8c897f 30%,#fff 50%,#8c897f 70%); background-size:250% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shim 2.2s linear infinite; }
+  @keyframes shim { from { background-position:150% 0; } to { background-position:-100% 0; } }
+  #dB .stream { margin-top:30px; width:min(520px,100%); text-align:left; font-size:14px; line-height:1.9; color:#a9a698; background:#1f1e1d; border:1px solid #3a3836; border-radius:12px; padding:16px 18px; min-height:112px; }
+  #dB .stream i { display:inline-block; width:7px; height:1em; background:#d97757; vertical-align:-2px; animation:blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #dB .cancel { color:#a9a698; }
+
+  /* =========================================================
+     案C: 文章が組み上がる（紙面 + スケルトン行が書かれていく）
+     ========================================================= */
+  #dC { background:radial-gradient(circle at 50% 30%,#f3ece0,#e6ddcc); color:#3d3929; }
+  #dC .paper { width:min(360px,92%); background:#fffdf8; border-radius:14px; padding:26px 24px 22px; box-shadow:0 18px 50px rgba(61,57,41,.18),0 2px 6px rgba(61,57,41,.1); text-align:left; position:relative; }
+  #dC .paper .ttl { height:12px; width:46%; border-radius:6px; background:#d97757; margin-bottom:20px; animation:cTitle 3.6s ease-in-out infinite; transform-origin:left; }
+  #dC .line { height:9px; border-radius:5px; background:#e9e3d5; margin-bottom:11px; transform-origin:left; animation:cWrite 3.6s ease-in-out infinite; }
+  #dC .line:nth-of-type(2){ animation-delay:.2s; width:100%; } #dC .line:nth-of-type(3){ animation-delay:.5s; width:94%; }
+  #dC .line:nth-of-type(4){ animation-delay:.8s; width:98%; } #dC .line:nth-of-type(5){ animation-delay:1.1s; width:62%; }
+  @keyframes cWrite { 0% { transform:scaleX(0); opacity:.2; } 45%,80% { transform:scaleX(1); opacity:1; background:#d8cfbb; } 100% { transform:scaleX(1); opacity:0; } }
+  @keyframes cTitle { 0% { transform:scaleX(0); } 25%,80% { transform:scaleX(1); } 100% { transform:scaleX(1); opacity:0; } }
+  #dC .pen { position:absolute; right:-14px; bottom:-18px; width:46px; height:46px; border-radius:50%; background:#d97757; display:grid; place-items:center; box-shadow:0 6px 16px rgba(217,119,87,.45); animation:cPen 1.8s ease-in-out infinite; }
+  #dC .pen svg { width:22px; height:22px; fill:#fff; }
+  @keyframes cPen { 0%,100% { transform:translate(0,0) rotate(0); } 50% { transform:translate(-10px,-6px) rotate(-8deg); } }
+  #dC .msg { margin-top:34px; font-size:19px; font-weight:600; }
+  #dC .cancel { color:#6b6654; }
+
+  /* =========================================================
+     案D: ニューラル・コンステレーション（ダーク + 光る接続）
+     ========================================================= */
+  #dD { background:radial-gradient(ellipse at center,#14182b 0%,#0a0c18 100%); color:#dfe6ff; }
+  #dD canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #dD .core { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; }
+  #dD .core .orb { width:84px; height:84px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#ffd7c4,#d97757 55%,#7a2f18); box-shadow:0 0 40px 6px rgba(217,119,87,.55),0 0 90px 20px rgba(217,119,87,.2); animation:dPulse 2.4s ease-in-out infinite; }
+  @keyframes dPulse { 0%,100% { transform:scale(.94); } 50% { transform:scale(1.08); } }
+  #dD .msg { margin-top:30px; font-size:18px; letter-spacing:.08em; text-shadow:0 0 12px rgba(150,170,255,.5); }
+  #dD .cancel { color:#b8c4ff; position:relative; z-index:1; }
+  #dD .sub { position:relative; z-index:1; }
+
+  /* ドット（A用） */
+  @keyframes dots { 0% { content:""; } 25% { content:"."; } 50% { content:".."; } 75%,100% { content:"..."; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ov *, .ov *::before, .ov *::after { animation-duration:0.01ms !important; animation-iteration-count:1 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ctl">
+  <b>デザイン案</b>
+  <button data-d="A" class="on">A Claude風</button>
+  <button data-d="B">B 思考中シマー</button>
+  <button data-d="C">C 文章が組み上がる</button>
+  <button data-d="D">D ニューラル</button>
+  <button data-d="GA">G-A 暖色(Gemini案)</button>
+  <button data-d="GB">G-B ダーク(Gemini案)</button>
+  <button data-d="GE">G-E ピル(Gemini案)</button>
+  <button data-d="GF">G-F コズミック(Gemini案)</button>
+  <span class="sep"></span>
+  <b>状況</b>
+  <button data-s="normal" class="on">通常</button>
+  <button data-s="retry">混雑で再試行</button>
+  <button data-s="fallback">軽量モデル切替</button>
+  <span class="sep"></span>
+  <button id="mob">📱 モバイル幅</button>
+  <button id="replay">↻ 経過時間リセット</button>
+</div>
+
+<div class="stage-wrap"><div class="stage" id="stage">
+
+  <!-- 案A -->
+  <div class="ov show" id="dA">
+    <svg class="spark" viewBox="0 0 100 100" aria-hidden="true">
+      <path d="M50 4 L55 40 L50 50 L45 40Z"/><path d="M50 96 L45 60 L50 50 L55 60Z"/>
+      <path d="M4 50 L40 45 L50 50 L40 55Z"/><path d="M96 50 L60 55 L50 50 L60 45Z"/>
+      <path d="M17 17 L43 41 L50 50 L41 43Z"/><path d="M83 83 L57 59 L50 50 L59 57Z"/>
+      <path d="M83 17 L59 43 L50 50 L57 41Z"/><path d="M17 83 L41 57 L50 50 L43 59Z"/>
+    </svg>
+    <div class="msg" data-msg></div>
+    <div class="sub" data-sub></div>
+    <button class="cancel">キャンセル</button>
+  </div>
+
+  <!-- 案B -->
+  <div class="ov" id="dB">
+    <div class="think">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 2 L58 42 L98 50 L58 58 L50 98 L42 58 L2 50 L42 42Z"/></svg>
+      <span class="shimmer" data-msg></span>
+    </div>
+    <div class="stream" aria-hidden="true"><span id="streamTxt"></span><i></i></div>
+    <div class="sub" data-sub></div>
+    <button class="cancel">キャンセル</button>
+  </div>
+
+  <!-- 案C -->
+  <div class="ov" id="dC">
+    <div class="paper">
+      <div class="ttl"></div>
+      <div class="line"></div><div class="line"></div><div class="line"></div><div class="line"></div><div class="line"></div>
+      <div class="pen"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
+    </div>
+    <div class="msg" data-msg></div>
+    <div class="sub" data-sub></div>
+    <button class="cancel">キャンセル</button>
+  </div>
+
+  <!-- 案D -->
+  <div class="ov" id="dD">
+    <canvas></canvas>
+    <div class="core"><div class="orb"></div><div class="msg" data-msg></div></div>
+    <div class="sub" data-sub></div>
+    <button class="cancel">キャンセル</button>
+  </div>
+
+  <!-- Gemini D から取り込んだ案（独立した画面をそのまま埋め込み） -->
+  <iframe class="ov gm" id="dGA" src="gemini-import/mockup-a-claude-warm.html" title="G-A"></iframe>
+  <iframe class="ov gm" id="dGB" src="gemini-import/mockup-b-claude-dark-artifact.html" title="G-B"></iframe>
+  <iframe class="ov gm" id="dGE" src="gemini-import/mockup-e-minimal-shimmer.html" title="G-E"></iframe>
+  <iframe class="ov gm" id="dGF" src="gemini-import/mockup-f-cosmic-intelligence.html" title="G-F"></iframe>
+
+</div></div>
+
+<script>
+(function () {
+  // 本番の setSpinnerText() に流し込む文言と同じ種類を再現
+  const MSGS = {
+    normal:  ['Thinking', 'Pondering', 'Musing', 'Cooking', 'Baking', 'Crafting', 'Computing', 'Reticulating', 'Noodling', 'Clauding'],
+    retry:   ['混雑のため再試行しています…（1/3）'],
+    fallback:['応答に時間がかかったため、軽量モデル（gemini-flash-lite-latest）で再試行しています…']
+  };
+  const STREAMS = [
+    '拝啓　平素より当マンションの運営にご理解とご協力を賜り、誠にありがとうございます。 当マンションではキントーンを用いたデジタル化を推進しています。',
+    "The orange chocolate flavor of KitKat is delicious, so please give it a try! Also, its color looks a lot like Claude's, which makes it kind of cute!"
+  ];
+  let design = 'A', status = 'normal', t0 = Date.now(), idx = 0, sIdx = 0;
+
+  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+  const ovs = { A:dA, B:dB, C:dC, D:dD, GA:dGA, GB:dGB, GE:dGE, GF:dGF };
+
+  function setMsg(txt) {
+    $$('[data-msg]').forEach(el => { el.classList.add('fade'); setTimeout(() => { el.textContent = txt; el.classList.remove('fade'); }, 300); });
+  }
+  function render() {
+    Object.entries(ovs).forEach(([k, el]) => el.classList.toggle('show', k === design));
+    pick(); 
+  }
+  // 通常時はランダム（直前と同じ語は連続させない）、それ以外は固定文言
+  function pick() {
+    const l = MSGS[status];
+    if (status === 'normal') { let n; do { n = Math.floor(Math.random() * l.length); } while (n === idx && l.length > 1); idx = n; }
+    else idx = 0;
+    setMsg(l[idx]);
+  }
+  $$('.ctl [data-d]').forEach(b => b.onclick = () => { design = b.dataset.d; $$('.ctl [data-d]').forEach(x => x.classList.toggle('on', x === b)); render(); });
+  $$('.ctl [data-s]').forEach(b => b.onclick = () => { status = b.dataset.s; $$('.ctl [data-s]').forEach(x => x.classList.toggle('on', x === b)); render(); });
+  mob.onclick = () => { stage.classList.toggle('mobile'); mob.classList.toggle('on'); };
+  replay.onclick = () => { t0 = Date.now(); };
+
+  // 文言ローテーション + 経過秒
+  setInterval(() => { if (status === 'normal') pick(); }, 2400);
+  // 経過時間の横に出す一言（Gemini案の5文の英訳）。5秒ごとに次の文へ
+  const TIPS = [
+    'Chocolat Orange KitKat is seriously delicious~',
+    'Between Claude, ChatGPT, and Gemini, which one do you like best?',
+    'Are you a dog person or a cat person?',
+    "I'm craving a strawberry Pon de Ring donut.",
+    'My favorite song is "This Is the Greatest Show."'
+  ];
+  setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); const tip = TIPS[Math.floor(s / 5) % TIPS.length]; $$('[data-sub]').forEach(el => el.textContent = tip + ' ・ 経過 ' + s + ' 秒'); }, 500);
+  render();
+
+  // 案B: ストリーミング風
+  // 2文を順に打ち込み、書き終えたら少し間を置いて次の文へ
+  let sNo = 0;
+  setInterval(() => {
+    const t = STREAMS[sNo];
+    sIdx++;
+    streamTxt.textContent = t.slice(0, sIdx);
+    if (sIdx >= t.length + 20) { sIdx = 0; sNo = (sNo + 1) % STREAMS.length; }
+  }, 45);
+
+  // 案D: ノードネットワーク
+  const cv = $$('#dD canvas')[0], cx = cv.getContext('2d');
+  let nodes = [];
+  function fit() { cv.width = cv.clientWidth * devicePixelRatio; cv.height = cv.clientHeight * devicePixelRatio; nodes = Array.from({length: 46}, () => ({ x: Math.random()*cv.width, y: Math.random()*cv.height, vx:(Math.random()-.5)*.5*devicePixelRatio, vy:(Math.random()-.5)*.5*devicePixelRatio })); }
+  new ResizeObserver(fit).observe(cv);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (function loop() {
+    if (design === 'D' && cv.width) {
+      cx.clearRect(0, 0, cv.width, cv.height);
+      const R = 150 * devicePixelRatio, ph = Date.now() / 700;
+      nodes.forEach(n => { if (!reduce) { n.x += n.vx; n.y += n.vy; } if (n.x<0||n.x>cv.width) n.vx*=-1; if (n.y<0||n.y>cv.height) n.vy*=-1; });
+      for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+        const a=nodes[i], b=nodes[j], d=Math.hypot(a.x-b.x,a.y-b.y);
+        if (d<R) { cx.strokeStyle = `rgba(140,165,255,${(1-d/R)*(.25+.2*Math.sin(ph+i))})`; cx.lineWidth=devicePixelRatio; cx.beginPath(); cx.moveTo(a.x,a.y); cx.lineTo(b.x,b.y); cx.stroke(); }
+      }
+      nodes.forEach((n,i) => { cx.fillStyle = i%7===0 ? 'rgba(217,119,87,.9)' : 'rgba(180,196,255,.8)'; cx.beginPath(); cx.arc(n.x,n.y,(i%7===0?3:2)*devicePixelRatio,0,7); cx.fill(); });
+    }
+    requestAnimationFrame(loop);
+  })();
+})();
+</script>
+</body>
+</html>

@@ -66,7 +66,7 @@
   const OVERLAY_ID = 'kintone-spinner-overlay';
   const TEXT_ID = 'kintone-spinner-text';
   const STYLE_ID = 'obp-loading-style';
-  const CLASSIC_TEXT = 'Geminiが思考中です...';
+  const CLASSIC_TEXT = 'AIが文章を作成中です…';
   const WORDS = [
     'Thinking',
     'Pondering',

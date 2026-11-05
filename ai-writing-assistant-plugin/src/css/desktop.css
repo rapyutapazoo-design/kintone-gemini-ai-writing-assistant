@@ -154,3 +154,18 @@
     font-size: 13px;
   }
 }
+
+/* 送信前の個人情報の注意と複数行の生成結果通知 */
+.obp-pii-warning {
+  background: #fff8df;
+  color: #795b00;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+}
+
+.obp-notice-text {
+  white-space: pre-line;
+}

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>案A: Claude Editorial Warmth（クロード・エディトリアル・ウォーム） — 単体モックアップ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: #F5F6F8;
+      color: #333;
+      min-height: 100vh;
+    }
+    /* 背景のダミーKintone画面 */
+    .dummy-kintone-header {
+      background: #FFBF00; height: 48px; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between; font-weight: bold;
+    }
+    .dummy-kintone-body {
+      max-width: 980px; margin: 32px auto; padding: 28px;
+      background: #fff; border: 1px solid #E3E7E8; border-radius: 6px;
+    }
+    .dummy-field {
+      margin-bottom: 18px;
+    }
+    .dummy-label { font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #444; }
+    .dummy-box {
+      border: 1px solid #D8DCE3; background: #FAFAFA; border-radius: 4px; padding: 12px; font-size: 14px; color: #555;
+    }
+    /* 下部フローティングコントローラー */
+    .floating-toolbar {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 20000;
+      background: rgba(25, 25, 24, 0.94); color: #FAF8F5;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px; padding: 8px 16px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      font-size: 12px;
+    }
+    .tb-btn {
+      background: #2E2D2A; color: #EEE; border: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 12px;
+      text-decoration: none;
+    }
+    .tb-btn:hover { background: #D97757; border-color: #D97757; color: #fff; }
+    #kintone-spinner-text { transition: opacity 0.25s ease, transform 0.25s ease; }
+    #kintone-spinner-text.phrase-fade { opacity: 0; transform: translateY(3px); }
+    .stream-sentence-box {
+      width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 9px;
+      font-family: 'JetBrains Mono', monospace, sans-serif; font-size: 11.5px; line-height: 1.5;
+      text-align: left; min-height: 44px; display: flex; align-items: center; box-sizing: border-box;
+    }
+    .stream-sentence-light { background: rgba(217, 119, 87, 0.08); border: 1px solid rgba(217, 119, 87, 0.25); color: #4A453E; }
+    .stream-sentence-dark { background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(217, 119, 87, 0.35); color: #EAE4D9; }
+    .stream-cursor {
+      display: inline-block; width: 6px; height: 13px; background: #D97757;
+      margin-left: 3px; vertical-align: middle; animation: streamCursorBlink 0.9s steps(2, start) infinite;
+    }
+    @keyframes streamCursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    
+        #kintone-spinner-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(34, 31, 27, 0.46);
+            backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+            font-family: 'Inter', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+            transition: opacity 0.4s ease;
+        }
+        .cw-card {
+            background: #FAF8F5;
+            border: 1px solid #E6E0D5;
+            border-radius: 22px;
+            padding: 34px 38px 28px;
+            width: min(440px, calc(100vw - 32px));
+            box-shadow: 0 24px 60px rgba(28, 25, 21, 0.22), 0 4px 16px rgba(28, 25, 21, 0.08);
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            position: relative; overflow: hidden;
+        }
+        .cw-top-bar {
+            position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            background: #EFEAE1; overflow: hidden;
+        }
+        .cw-top-bar::after {
+            content: ''; position: absolute; top: 0; left: -40%; width: 40%; height: 100%;
+            background: linear-gradient(90deg, transparent, #D97757, #E5987D, transparent);
+            animation: cwSlideBar 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        @keyframes cwSlideBar { 0% { left: -40%; } 100% { left: 100%; } }
+        .cw-emblem-wrap {
+            position: relative; width: 78px; height: 78px;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 18px;
+        }
+        .cw-halo {
+            position: absolute; inset: 0; border-radius: 50%;
+            background: radial-gradient(circle, rgba(217, 119, 87, 0.24) 0%, rgba(217, 119, 87, 0) 70%);
+            animation: cwHaloPulse 3s ease-in-out infinite;
+        }
+        .cw-ring-subtle {
+            position: absolute; inset: 6px; border-radius: 50%;
+            border: 1px dashed rgba(217, 119, 87, 0.38);
+            animation: cwSlowSpin 18s linear infinite;
+        }
+        .cw-starburst-svg {
+            width: 44px; height: 44px; z-index: 2;
+            animation: cwStarBreathe 4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+            filter: drop-shadow(0 4px 12px rgba(217, 119, 87, 0.35));
+        }
+        @keyframes cwHaloPulse {
+            0%, 100% { transform: scale(0.92); opacity: 0.7; }
+            50% { transform: scale(1.18); opacity: 1; }
+        }
+        @keyframes cwSlowSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes cwStarBreathe {
+            0%, 100% { transform: rotate(0deg) scale(0.95); }
+            50% { transform: rotate(90deg) scale(1.08); }
+        }
+        #kintone-spinner-text {
+            font-family: 'Georgia', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+            font-size: 18px; font-weight: 600; color: #1F1E1D;
+            letter-spacing: 0.02em; margin-bottom: 6px; line-height: 1.45;
+        }
+        .cw-subtitle { font-size: 12.5px; color: #787268; margin-bottom: 18px; }
+        .cw-manuscript-box {
+            width: 100%; background: #F3EFE8; border: 1px solid #E5DFD3;
+            border-radius: 12px; padding: 12px 16px;
+            display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; text-align: left;
+        }
+        .cw-ms-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 10.5px; font-weight: 600; color: #8C857B; letter-spacing: 0.04em;
+        }
+        .cw-ms-line {
+            height: 7px; border-radius: 999px; background: #E2DCD0;
+            overflow: hidden; position: relative;
+        }
+        .cw-ms-line.l1 { width: 55%; }
+        .cw-ms-line.l2 { width: 92%; }
+        .cw-ms-line.l3 { width: 78%; }
+        .cw-ms-line::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, #D97757 0%, #E6A087 60%, #E2DCD0 100%);
+            transform-origin: left; animation: cwLineDraft 2.8s ease-in-out infinite;
+        }
+        .cw-ms-line.l2::after { animation-delay: 0.4s; }
+        .cw-ms-line.l3::after { animation-delay: 0.8s; }
+        @keyframes cwLineDraft {
+            0% { transform: scaleX(0.1); opacity: 0.5; }
+            50% { transform: scaleX(1); opacity: 1; }
+            100% { transform: scaleX(0.2); opacity: 0.5; }
+        }
+        .cw-steps { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #7A746B; }
+        .cw-step-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: #D97757;
+            animation: cwDotBlink 1.4s ease-in-out infinite;
+        }
+        @keyframes cwDotBlink {
+            0%, 100% { opacity: 0.35; transform: scale(0.85); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        
+  </style>
+</head>
+<body>
+  <div class="dummy-kintone-header">
+    <span>☁ kintone — 意見書・文書作成アプリ（プレビュー背景）</span>
+    <span style="font-size:12px;">案A: Claude Editorial Warmth（クロード・エディトリアル・ウォーム）</span>
+  </div>
+  <div class="dummy-kintone-body">
+    <div class="dummy-field">
+      <div class="dummy-label">AIへの指示・メモ</div>
+      <div class="dummy-box">駐輪場のラック老朽化について。上段ラックが重くて高齢者が使いづらいため、次期総会でスライド式ラックへの更新を提案したい。</div>
+    </div>
+    <div class="dummy-field">
+      <div class="dummy-label">件名</div>
+      <div class="dummy-box">駐輪場ラックのスライド式への更新提案について</div>
+    </div>
+    <div class="dummy-field">
+      <div class="dummy-label">本文</div>
+      <div class="dummy-box" style="min-height: 180px;">■ 現状の課題<br>・現在設置されている二段式駐輪場の上段ラックは昇降時の負荷が大きく...</div>
+    </div>
+  </div>
+
+  <!-- ローディング画面オーバーレイ本体 -->
+  <div id="kintone-spinner-overlay">
+    
+        <div class="cw-card">
+          <div class="cw-top-bar"></div>
+          <div class="cw-emblem-wrap">
+            <div class="cw-halo"></div>
+            <div class="cw-ring-subtle"></div>
+            <svg class="cw-starburst-svg" viewBox="0 0 64 64" fill="none">
+              <g stroke="#D97757" stroke-linecap="round">
+                <line x1="32" y1="6" x2="32" y2="58" stroke-width="4.2"/>
+                <line x1="6" y1="32" x2="58" y2="32" stroke-width="4.2"/>
+                <line x1="13.6" y1="13.6" x2="50.4" y2="50.4" stroke-width="3.8"/>
+                <line x1="50.4" y1="13.6" x2="13.6" y2="50.4" stroke-width="3.8"/>
+                <line x1="19" y1="9.5" x2="45" y2="54.5" stroke-width="3.2" opacity="0.85"/>
+                <line x1="9.5" y1="19" x2="54.5" y2="45" stroke-width="3.2" opacity="0.85"/>
+                <line x1="45" y1="9.5" x2="19" y2="54.5" stroke-width="3.2" opacity="0.85"/>
+                <line x1="54.5" y1="19" x2="9.5" y2="45" stroke-width="3.2" opacity="0.85"/>
+              </g>
+              <circle cx="32" cy="32" r="6" fill="#D97757"/>
+              <circle cx="32" cy="32" r="2.5" fill="#FAF8F5"/>
+            </svg>
+          </div>
+          <div id="kintone-spinner-text">Thinking...</div>
+          <div class="cw-subtitle">文章を作成中 — メモの意図を汲み取り、丁寧な文章へ仕立てています</div>
+          <div class="cw-manuscript-box">
+            <div class="cw-ms-header">
+              <span>✦ AI WRITING</span>
+              <span style="color:#D97757;">● 文章を作成中</span>
+            </div>
+            <div class="cw-ms-line l1"></div>
+            <div class="cw-ms-line l2"></div>
+            <div class="cw-ms-line l3"></div>
+            <div class="stream-sentence-box stream-sentence-light"><span><span class="stream-text-target">Chocolat Orange KitKat is seriously delicious~</span><span class="stream-cursor"></span></span></div>
+          </div>
+          <div class="cw-steps">
+            <span class="cw-step-dot"></span>
+            <span>文脈解析・構成案の作成・推敲を自動実行中</span>
+          </div>
+        </div>
+        
+  </div>
+
+  <!-- テスト用ツールバー -->
+  <div class="floating-toolbar">
+    <a class="tb-btn" href="index.html">← 6案比較ギャラリーへ戻る</a>
+    <button class="tb-btn" onclick="startNormalCycle()">🎲 10単語ランダム表示</button>
+    <button class="tb-btn" onclick="pickNextWordNow()">↻ 次の単語へ</button>
+    <button class="tb-btn" onclick="nextStreamSentenceNow()">💬 次の英文メッセージへ</button>
+    <button class="tb-btn" onclick="setSpinnerTextManual('混雑のため再試行しています…（1/2）')">リトライ文言</button>
+    <button class="tb-btn" onclick="setSpinnerTextManual('応答に時間がかかったため、軽量モデルで再試行しています…')">フォールバック文言</button>
+    <button class="tb-btn" onclick="toggleOverlay()">表示 ON/OFF</button>
+  </div>
+
+  <script>
+    const RANDOM_WORDS = [
+      'Thinking...',
+      'Pondering...',
+      'Musing...',
+      'Cooking...',
+      'Baking...',
+      'Crafting...',
+      'Computing...',
+      'Reticulating...',
+      'Noodling...',
+      'Clauding...'
+    ];
+    const STREAM_SENTENCES = [
+      'Chocolat Orange KitKat is seriously delicious~',
+      'Between Claude, ChatGPT, and Gemini, which one do you like best?',
+      'Are you a dog person or a cat person?',
+      'I\'m craving a strawberry Pon de Ring donut.',
+      'My favorite song is "This Is the Greatest Show."'
+    ];
+    let currentSentenceIdx = 0;
+    let currentCharIdx = 0;
+    let lastWordIdx = -1;
+    let cycleTimer = null;
+
+    function startStreamTyping() {
+      setInterval(() => {
+        const fullText = STREAM_SENTENCES[currentSentenceIdx];
+        currentCharIdx++;
+        const slice = fullText.slice(0, currentCharIdx);
+        document.querySelectorAll('.stream-text-target').forEach((el) => {
+          el.textContent = slice;
+        });
+        if (currentCharIdx >= fullText.length + 28) {
+          currentCharIdx = 0;
+          currentSentenceIdx = (currentSentenceIdx + 1) % STREAM_SENTENCES.length;
+        }
+      }, 45);
+    }
+
+    function nextStreamSentenceNow() {
+      currentSentenceIdx = (currentSentenceIdx + 1) % STREAM_SENTENCES.length;
+      currentCharIdx = STREAM_SENTENCES[currentSentenceIdx].length;
+      document.querySelectorAll('.stream-text-target').forEach((el) => {
+        el.textContent = STREAM_SENTENCES[currentSentenceIdx];
+      });
+    }
+
+    function pickRandomWord() {
+      let nextIdx;
+      do {
+        nextIdx = Math.floor(Math.random() * RANDOM_WORDS.length);
+      } while (nextIdx === lastWordIdx && RANDOM_WORDS.length > 1);
+      lastWordIdx = nextIdx;
+      return RANDOM_WORDS[nextIdx];
+    }
+
+    function setSpinnerText(text, animate = true) {
+      const el = document.getElementById('kintone-spinner-text');
+      if (!el) return;
+      if (!animate) {
+        el.innerText = text;
+        return;
+      }
+      el.classList.add('phrase-fade');
+      setTimeout(() => {
+        el.innerText = text;
+        el.classList.remove('phrase-fade');
+      }, 180);
+    }
+
+    function setSpinnerTextManual(text) {
+      if (cycleTimer) {
+        clearInterval(cycleTimer);
+        cycleTimer = null;
+      }
+      setSpinnerText(text, true);
+    }
+
+    function pickNextWordNow() {
+      setSpinnerText(pickRandomWord(), true);
+    }
+
+    function startNormalCycle() {
+      if (cycleTimer) clearInterval(cycleTimer);
+      setSpinnerText(pickRandomWord(), false);
+      cycleTimer = setInterval(() => {
+        setSpinnerText(pickRandomWord(), true);
+      }, 2400);
+    }
+
+    function toggleOverlay() {
+      const el = document.getElementById('kintone-spinner-overlay');
+      if (!el) return;
+      el.style.opacity = el.style.opacity === '0' ? '1' : '0';
+      el.style.pointerEvents = el.style.opacity === '0' ? 'none' : 'auto';
+    }
+
+    startNormalCycle();
+    startStreamTyping();
+  </script>
+</body>
+</html>
