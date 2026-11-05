@@ -732,10 +732,7 @@
     // 主モデルには最低30秒を残し、確保できるのが10秒未満なら従来の動作にする。
     const fallbackModel = pickFallbackModel(primaryModel, []);
     const reserveMs = fallbackModel
-      ? Math.min(
-          PROXY_TIMEOUT_MS,
-          Math.max(deadlineAt - Date.now() - 30000, 0),
-        )
+      ? Math.min(PROXY_TIMEOUT_MS, Math.max(deadlineAt - Date.now() - 30000, 0))
       : 0;
     const reserved = reserveMs >= 10000;
     const primaryDeadlineAt = reserved ? deadlineAt - reserveMs : deadlineAt;
