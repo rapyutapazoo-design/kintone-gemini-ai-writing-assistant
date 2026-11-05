@@ -1,0 +1,43 @@
+const {chromium} = require('/Users/hiroki/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const path = require('path');
+const fs = require('fs');
+(async () => {
+ const browser = await chromium.launch({channel:'chrome',headless:true});
+ const page = await browser.newPage({viewport:{width:1440,height:1080},deviceScaleFactor:1});
+ const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+ const checks=[];
+ const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label)};
+ await page.goto('file://'+path.join(__dirname,'index.html'));
+ for(const theme of ['bloom','orbit','draft']){
+   await page.locator(`[data-design="${theme}"]`).click();
+   await page.waitForTimeout(450);
+   check(await page.locator('body').getAttribute('data-theme')===theme,theme+' theme selected');
+   await page.screenshot({path:path.join(__dirname,'preview-'+theme+'.png'),fullPage:true});
+ }
+ await page.locator('#complete').click();
+ check(await page.locator('#loading-title').textContent()==='文章ができあがりました','Completion state');
+ await page.locator('#replay').click(); await page.locator('#cancel').click();
+ check(await page.locator('#loading-title').textContent()==='作成を中止しました','Cancellation state');
+ await page.locator('#cancel').click();
+ check(await page.locator('.loading-card').getAttribute('aria-busy')==='true','Restart state');
+ await page.locator('#motion').click(); check(await page.locator('body').evaluate(el=>el.classList.contains('paused')),'Animation paused');
+ await page.locator('#motion').click();
+ await page.setViewportSize({width:390,height:844}); await page.locator('[data-design="bloom"]').click();
+ await page.waitForTimeout(500);
+ check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile no horizontal overflow');
+ check(await page.locator('.loading-card').evaluate(el=>{const card=el.getBoundingClientRect();const stage=el.parentElement.getBoundingClientRect();return card.left>=stage.left&&card.right<=stage.right;}),'Mobile card fully visible');
+ await page.screenshot({path:path.join(__dirname,'preview-mobile.png'),fullPage:true});
+ await page.setViewportSize({width:320,height:740});
+ check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'320px no horizontal overflow');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ check(await page.locator('.bloom-art').evaluate(el=>getComputedStyle(el).animationName)==='none','Reduced motion respected');
+ await page.locator('#replay').click();
+ await page.waitForTimeout(6500);
+ check((await page.locator('#phase-label').textContent()).includes('組み立て'),'Timed phase progression');
+ await page.waitForTimeout(12000);
+ check(await page.locator('#status-pill').textContent()==='COMPLETE','Automatic completion');
+ check(errors.length===0,'No JavaScript errors');
+ fs.writeFileSync(path.join(__dirname,'verification-results.json'),JSON.stringify({checks,errors},null,2));
+ console.log(JSON.stringify({checks,errors},null,2));
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

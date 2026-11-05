@@ -346,7 +346,13 @@
   // （タイムアウト）になる。設定画面からは絶対にこの関数を使わないこと。
   // 設定画面での疎通確認・モデル一覧取得は直接通信（checkModelAvailability /
   // listGenerateContentModels）を使う。
-  function proxyRequest(pluginId, url, method, headers, data) {
+  // 第6引数 timeoutMs は省略可能で、数値でなければ PROXY_TIMEOUT_MS を使う。
+  // 結果の headers は応答ヘッダ（取得できない環境では null）。
+  function proxyRequest(pluginId, url, method, headers, data, timeoutMs) {
+    const waitMs =
+      typeof timeoutMs === 'number' && isFinite(timeoutMs) && timeoutMs > 0
+        ? timeoutMs
+        : PROXY_TIMEOUT_MS;
     return new Promise((resolve, reject) => {
       let done = false;
       const timer = setTimeout(() => {
@@ -354,8 +360,8 @@
         done = true;
         // kintone.plugin.app.proxy()には呼び出し側から中断する手段がないため、
         // 応答を待つのをここで諦めて warn 扱い（status:0）として先に進む。
-        resolve({ status: 0, body: null });
-      }, PROXY_TIMEOUT_MS);
+        resolve({ status: 0, body: null, headers: null });
+      }, waitMs);
 
       function finishResolve(result) {
         if (done) return;
@@ -383,9 +389,13 @@
           method,
           headers,
           data,
-          (body, status) => {
+          (body, status, resHeaders) => {
             // コールバック形式（旧 kintone SDK）。
-            finishResolve({ status: status, body: normalizeProxyBody(body) });
+            finishResolve({
+              status: status,
+              body: normalizeProxyBody(body),
+              headers: resHeaders || null,
+            });
           },
           (err) => {
             finishReject(
@@ -405,7 +415,12 @@
           (arr) => {
             const body = Array.isArray(arr) ? arr[0] : undefined;
             const status = Array.isArray(arr) ? arr[1] : undefined;
-            finishResolve({ status: status, body: normalizeProxyBody(body) });
+            const resHeaders = Array.isArray(arr) ? arr[2] : undefined;
+            finishResolve({
+              status: status,
+              body: normalizeProxyBody(body),
+              headers: resHeaders || null,
+            });
           },
           (rejectValue) => {
             // kintone側のエラー本文（GAIA_PR03等）を呼び出し元（classifyError）
@@ -451,6 +466,8 @@
   //   deadlineAt      全体の期限（epoch ms）。次の送信が収まらなければ打ち切る
   //   maxAttempts     再試行回数の上限（既定は RETRY_MAX_ATTEMPTS）
   //   shouldStopRetry 直前の応答 res を受け取り、true なら再試行せず返す
+  //   retryStatuses   再試行の対象にする status の配列（既定は RETRY_STATUSES）
+  //   timeoutMs       1回の送信の待ち時間（既定は PROXY_TIMEOUT_MS）。期限の判定にも使う
   async function proxyRequestWithRetry(
     pluginId,
     url,
@@ -465,10 +482,28 @@
       typeof opts.maxAttempts === 'number'
         ? opts.maxAttempts
         : RETRY_MAX_ATTEMPTS;
+    const retryStatuses = Array.isArray(opts.retryStatuses)
+      ? opts.retryStatuses
+      : RETRY_STATUSES;
+    const callTimeoutMs = opts.timeoutMs || PROXY_TIMEOUT_MS;
     for (let attempt = 0; attempt <= maxAttempts; attempt++) {
-      const res = await proxyRequest(pluginId, url, method, headers, data);
+      const remainingMs =
+        typeof opts.deadlineAt === 'number'
+          ? opts.deadlineAt - Date.now()
+          : Infinity;
+      if (remainingMs <= 0) {
+        return { status: 0, body: null, headers: null };
+      }
+      const res = await proxyRequest(
+        pluginId,
+        url,
+        method,
+        headers,
+        data,
+        Math.min(callTimeoutMs, remainingMs),
+      );
       const shouldRetry =
-        attempt < maxAttempts && RETRY_STATUSES.indexOf(res.status) !== -1;
+        attempt < maxAttempts && retryStatuses.indexOf(res.status) !== -1;
       if (!shouldRetry) {
         return res;
       }
@@ -481,7 +516,7 @@
       const wait = computeRetryWaitMs(attempt);
       if (
         typeof opts.deadlineAt === 'number' &&
-        Date.now() + wait > opts.deadlineAt - PROXY_TIMEOUT_MS
+        Date.now() + wait >= opts.deadlineAt - callTimeoutMs
       ) {
         return res;
       }
@@ -678,7 +713,9 @@
 
   // 主モデルで生成し、混雑（429/500/503）またはタイムアウトで失敗したら、より
   // 軽いモデルへ1回だけ切り替える。options: { model, body, thinkingMode,
-  // onProgress }。proxyRequest の reject はそのまま伝播する。
+  // onProgress, deadlineAt }。deadlineAt（epoch ms）を渡すとその時刻を全体の
+  // 期限にする（省略時は現在時刻＋TOTAL_DEADLINE_MS）。proxyRequest の reject
+  // はそのまま伝播する。
   async function generateContentWithFallback(pluginId, options) {
     const opts = options || {};
     const primaryModel = stripModelPrefix(opts.model);
@@ -686,7 +723,10 @@
     const thinkingMode = normalizeThinkingMode(opts.thinkingMode);
     const onProgress =
       typeof opts.onProgress === 'function' ? opts.onProgress : function () {};
-    const deadlineAt = Date.now() + TOTAL_DEADLINE_MS;
+    const deadlineAt =
+      typeof opts.deadlineAt === 'number'
+        ? opts.deadlineAt
+        : Date.now() + TOTAL_DEADLINE_MS;
     let thinkingDropped = false;
 
     function sendOnce(model, body, maxAttempts, stopRetryFn) {
@@ -925,6 +965,8 @@
     stripModelPrefix: stripModelPrefix,
     fetchWithTimeout: fetchWithTimeout,
     safeParseJson: safeParseJson,
+    parseErrorBody: parseErrorBody,
+    RETRY_STATUSES: RETRY_STATUSES,
     classifyError: classifyError,
     listGenerateContentModels: listGenerateContentModels,
     normalizeModelList: normalizeModelList,
