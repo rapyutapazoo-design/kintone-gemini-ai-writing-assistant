@@ -8,6 +8,7 @@
   const backup = window.GeminiPromptBackup;
   const router = window.AiProviderRouter;
   const piiMask = window.AiPiiMask;
+  const loading = window.AIWritingLoading;
 
   const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
 以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
@@ -134,72 +135,6 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         transition: all 0.2s ease;
     `;
-
-  // =========================================================
-  // 2. ローディング画面用CSS
-  // =========================================================
-  const LOADING_CSS = `
-        #kintone-spinner-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 9999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: linear-gradient(-45deg, #6a11cb, #2575fc, #f77062, #fe5196);
-            background-size: 400% 400%;
-            animation: gradientBG 10s ease infinite;
-            color: white; font-family: sans-serif;
-        }
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .spinner-container {
-            position: relative; width: 100px; height: 100px;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .spinner-ring {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border-radius: 50%; border: 2px solid transparent;
-            background: linear-gradient(#fff, rgba(255,255,255,0.2)) border-box;
-            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor; mask-composite: exclude;
-            animation: spin 1.5s linear infinite;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
-        }
-        .spinner-star {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); margin-left: 2px;
-            font-size: 45px; color: white;
-            animation: pulse-glow 2s ease-in-out infinite;
-            filter: drop-shadow(0 0 10px rgba(255,255,255,0.9));
-            z-index: 10; line-height: 1;
-        }
-        .sparkle {
-            position: absolute; background: white; border-radius: 50%; opacity: 0;
-            animation: sparkle-anim 2s infinite; top: 50%; left: 50%;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulse-glow { 
-            0%, 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.9; }
-            50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; text-shadow: 0 0 25px white; }
-        }
-        @keyframes sparkle-anim {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1); opacity: 0; }
-        }
-        .spinner-text {
-            font-size: 18px; font-weight: bold; margin-top: 30px;
-            letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-    `;
-
-  if (!document.getElementById('gemini-loading-video-style')) {
-    const style = document.createElement('style');
-    style.id = 'gemini-loading-video-style';
-    style.innerHTML = LOADING_CSS;
-    document.head.appendChild(style);
-  }
 
   // =========================================================
   // 3. ボタン表示ロジック
@@ -1040,47 +975,21 @@
   // =========================================================
   // 6. ローディング表示関数
   // =========================================================
+  // ローディング画面。デザインと表示方法（固定／ランダム／順番）は設定画面で選ぶ。
+  // ここでは設定を読んで loading-screens.js に渡すだけにしている。
+  const LOADING_STORAGE_KEY = 'obp_loading_' + PLUGIN_ID;
+  const LOADING_SETTINGS = loading.normalizeSettings({
+    mode: config.loading_mode,
+    design: config.loading_design,
+    designs: config.loading_designs,
+  });
+
   function showSpinner() {
-    if (document.getElementById('kintone-spinner-overlay')) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'kintone-spinner-overlay';
-    const container = document.createElement('div');
-    container.className = 'spinner-container';
-    const ring = document.createElement('div');
-    ring.className = 'spinner-ring';
-    const star = document.createElement('div');
-    star.className = 'spinner-star';
-    star.innerHTML = '✦';
-
-    for (let i = 0; i < 6; i++) {
-      const sparkle = document.createElement('div');
-      sparkle.className = 'sparkle';
-      sparkle.style.setProperty('--tx', Math.random() * 80 - 40 + 'px');
-      sparkle.style.setProperty('--ty', Math.random() * 80 - 40 + 'px');
-      sparkle.style.width = Math.random() * 4 + 2 + 'px';
-      sparkle.style.height = sparkle.style.width;
-      sparkle.style.animationDelay = Math.random() * 1.5 + 's';
-      container.appendChild(sparkle);
-    }
-
-    container.appendChild(ring);
-    container.appendChild(star);
-    const text = document.createElement('div');
-    text.id = 'kintone-spinner-text';
-    text.className = 'spinner-text';
-    text.innerText = 'AIが文章を作成中です…';
-    overlay.appendChild(container);
-    overlay.appendChild(text);
-    document.body.appendChild(overlay);
+    loading.show(loading.chooseDesign(LOADING_SETTINGS, LOADING_STORAGE_KEY));
   }
 
   function hideSpinner() {
-    const overlay = document.getElementById('kintone-spinner-overlay');
-    if (overlay) {
-      overlay.style.opacity = '0';
-      overlay.style.transition = 'opacity 0.5s';
-      setTimeout(() => overlay.remove(), 500);
-    }
+    loading.hide();
   }
 
   // 画面下部に固定表示する短い通知。1件のみ、8秒で自動消去する。
@@ -1121,9 +1030,6 @@
   // リトライ中の待機理由をスピナーに表示する。スピナー非表示中や要素が
   // 見つからない場合は何もしない（防御的実装）。
   function setSpinnerText(text) {
-    const el = document.getElementById('kintone-spinner-text');
-    if (el) {
-      el.innerText = text;
-    }
+    loading.setText(text);
   }
 })(kintone.$PLUGIN_ID);
