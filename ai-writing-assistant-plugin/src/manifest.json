@@ -1,11 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/kintone/js-sdk/%40kintone/plugin-manifest-validator%4010.2.0/packages/plugin-manifest-validator/manifest-schema.json",
   "manifest_version": 1,
-  "version": 10,
+  "version": 11,
   "type": "APP",
   "desktop": {
     "js": [
       "js/gemini-client.js",
+      "js/loading-screens.js",
       "js/generation-options.js",
       "js/prompt-backup.js",
       "js/desktop.js"
@@ -20,6 +21,7 @@
     "html": "html/config.html",
     "js": [
       "js/gemini-client.js",
+      "js/loading-screens.js",
       "js/generation-options.js",
       "js/prompt-presets.js",
       "js/config.js"
@@ -43,6 +45,7 @@
   "mobile": {
     "js": [
       "js/gemini-client.js",
+      "js/loading-screens.js",
       "js/generation-options.js",
       "js/prompt-backup.js",
       "js/desktop.js"

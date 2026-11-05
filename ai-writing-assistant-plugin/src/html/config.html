@@ -378,6 +378,40 @@
     </div>
   </details>
 
+  <details class="obp-section" open>
+    <summary class="obp-section-heading">7. ローディング画面</summary>
+    <div class="obp-section-body">
+      <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">表示方法</div>
+        <div class="kintoneplugin-desc">AIが文章を作成している間に表示する画面の選び方です。</div>
+        <div class="kintoneplugin-input-outer" id="obp-loading-mode-group">
+          <label><input type="radio" name="obp-loading-mode" id="obp-loading-mode-fixed" value="fixed" checked> 1つのデザインに固定する</label>
+          <label><input type="radio" name="obp-loading-mode" id="obp-loading-mode-random" value="random"> 選んだデザインからランダムに表示する</label>
+          <label><input type="radio" name="obp-loading-mode" id="obp-loading-mode-sequential" value="sequential"> 選んだデザインを順番に表示する</label>
+        </div>
+      </div>
+
+      <div class="kintoneplugin-row" id="obp-loading-fixed-row">
+        <div class="kintoneplugin-label">表示するデザイン</div>
+        <div class="kintoneplugin-input-outer">
+          <select id="obp-loading-design" class="kintoneplugin-select"></select>
+        </div>
+      </div>
+
+      <div class="kintoneplugin-row" id="obp-loading-pool-row" style="display:none">
+        <div class="kintoneplugin-label">表示に使うデザイン（1つ以上選択）</div>
+        <div class="kintoneplugin-desc">順番表示は、選んだデザインを下の並びで繰り返します。順番は端末（ブラウザ）ごとに記憶されます。</div>
+        <div id="obp-loading-pool"></div>
+      </div>
+
+      <div class="kintoneplugin-row">
+        <div class="kintoneplugin-label">プレビュー</div>
+        <div class="kintoneplugin-desc">各デザインのプレビューは、下の一覧の「プレビュー」ボタンから確認できます。画面右上の「閉じる」またはEscキーで戻ります。</div>
+        <div id="obp-loading-preview-list"></div>
+      </div>
+    </div>
+  </details>
+
   <div class="kintoneplugin-row">
     <button type="button" id="obp-cancel" class="kintoneplugin-button-dialog-cancel">キャンセル</button>
     <button type="button" id="obp-save" class="kintoneplugin-button-dialog-ok">保存</button>

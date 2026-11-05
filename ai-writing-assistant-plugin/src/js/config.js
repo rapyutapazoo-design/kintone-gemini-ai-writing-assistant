@@ -4,6 +4,7 @@
   const client = window.GeminiPluginClient;
   const genOpts = window.GeminiGenerationOptions;
   const presets = window.GeminiPromptPresets;
+  const loading = window.AIWritingLoading;
 
   const OPINION_PRESET = presets.getPreset('opinion');
   const DEFAULT_FORMAT_INSTRUCTION = genOpts.getFormatInstructionById(
@@ -35,6 +36,9 @@
     format_default: DEFAULT_FORMAT_INSTRUCTION,
     overwrite_confirm: 'yes',
     gemini_thinking: 'suppress',
+    loading_mode: 'fixed',
+    loading_design: 'claude-a',
+    loading_designs: '',
     preset_id: '',
     clear_input_after_draft: 'no',
     field_input_backup: '',
@@ -1119,6 +1123,9 @@
       );
     }
 
+    const loadingMode = getLoadingMode();
+    const loadingPool = getLoadingPool();
+
     const newConfig = {
       gemini_model: client.stripModelPrefix(modelName),
       field_input: document.getElementById('obp-field-input').value,
@@ -1159,6 +1166,9 @@
       gemini_thinking: document.getElementById('obp-thinking-default').checked
         ? 'default'
         : 'suppress',
+      loading_mode: loadingMode,
+      loading_design: document.getElementById('obp-loading-design').value,
+      loading_designs: loadingPool.join(','),
       preset_id: appliedPresetId || '',
       clear_input_after_draft: document.getElementById(
         'obp-clear-input-after-draft',
@@ -1219,6 +1229,13 @@
         );
         return;
       }
+    }
+
+    if (getLoadingMode() !== 'fixed' && getLoadingPool().length === 0) {
+      alert(
+        'ローディング画面の「表示に使うデザイン」を1つ以上選択してください。',
+      );
+      return;
     }
 
     // {{lengthInstruction}} / {{formatInstruction}} の欠落は警告のみで保存はブロックしない
@@ -1301,6 +1318,78 @@
 
   function backToFlowScreen() {
     window.location.href = '../../flow?app=' + kintone.app.getId();
+  }
+
+  // ---- ローディング画面の設定 ----
+  function getLoadingMode() {
+    const el = document.querySelector('input[name="obp-loading-mode"]:checked');
+    return el ? el.value : loading.DEFAULT_MODE;
+  }
+
+  function getLoadingPool() {
+    return Array.from(
+      document.querySelectorAll('input[name="obp-loading-pool"]:checked'),
+    ).map((el) => el.value);
+  }
+
+  function updateLoadingVisibility() {
+    const fixed = getLoadingMode() === 'fixed';
+    document.getElementById('obp-loading-fixed-row').style.display = fixed
+      ? ''
+      : 'none';
+    document.getElementById('obp-loading-pool-row').style.display = fixed
+      ? 'none'
+      : '';
+  }
+
+  function buildLoadingSettings() {
+    const select = document.getElementById('obp-loading-design');
+    const pool = document.getElementById('obp-loading-pool');
+    const previews = document.getElementById('obp-loading-preview-list');
+    const saved = loading.normalizeSettings({
+      mode: config.loading_mode,
+      design: config.loading_design,
+      designs: config.loading_designs,
+    });
+    const poolIsDefault = !config.loading_designs;
+
+    loading.DESIGNS.forEach((d) => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.label;
+      select.appendChild(opt);
+
+      const label = document.createElement('label');
+      label.style.display = 'block';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.name = 'obp-loading-pool';
+      cb.value = d.id;
+      cb.checked = poolIsDefault || saved.designs.indexOf(d.id) !== -1;
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + d.label));
+      pool.appendChild(label);
+
+      const row = document.createElement('div');
+      row.style.margin = '4px 0';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'kintoneplugin-button-normal';
+      btn.textContent = 'プレビュー';
+      btn.addEventListener('click', () => loading.preview(d.id));
+      row.appendChild(btn);
+      row.appendChild(
+        document.createTextNode(' ' + d.label + '：' + d.description),
+      );
+      previews.appendChild(row);
+    });
+
+    select.value = saved.design;
+    document.getElementById('obp-loading-mode-' + saved.mode).checked = true;
+    document
+      .getElementById('obp-loading-mode-group')
+      .addEventListener('change', updateLoadingVisibility);
+    updateLoadingVisibility();
   }
 
   function bindEvents() {
@@ -1533,6 +1622,12 @@
     loadFormatFromConfig();
     checkPromptDraftWarnings();
 
+    try {
+      buildLoadingSettings();
+    } catch (e) {
+      // ローディング設定の初期化失敗で、設定画面全体を止めない
+      console.error('ローディング設定の初期化に失敗しました', e);
+    }
     bindEvents();
     loadFields();
     loadSpaces();
