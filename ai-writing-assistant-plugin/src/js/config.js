@@ -2,6 +2,7 @@
   'use strict';
 
   const client = window.GeminiPluginClient;
+  const anthropic = window.AnthropicPluginClient;
   const genOpts = window.GeminiGenerationOptions;
   const presets = window.GeminiPromptPresets;
 
@@ -11,6 +12,10 @@
   );
 
   const DEFAULTS = {
+    ai_provider_order: 'anthropic,gemini',
+    anthropic_model: '',
+    anthropic_thinking: 'suppress',
+    pii_mask: 'yes',
     gemini_model: 'gemini-flash-lite-latest',
     field_input: 'keyword_input',
     field_length: 'length_option',
@@ -57,7 +62,8 @@
   const config = kintone.plugin.app.getConfig(PLUGIN_ID) || {};
 
   let validationSeq = 0;
-  let lastValidation = null;
+  const lastValidation = { anthropic: null, gemini: null };
+  let validationSeqAnthropic = 0;
   let fieldMetaCache = {};
   let currentLengthRows = genOpts.parseMap(config.length_map, []);
   let appliedPresetId = config.preset_id || '';
@@ -67,6 +73,11 @@
   // モデル一覧取得・疎通確認は直接通信でこの値を使う。
   // DOM（入力欄・メッセージ）へは絶対に書き出さないこと。
   let savedApiKeyValue = '';
+  let savedAnthropicKeyExists = false;
+  let savedAnthropicKeyMasked = '';
+  // 保存済みの実値は直接通信にだけ使い、DOMへは書き出さない。
+  let savedAnthropicKeyValue = '';
+  let allFetchedAnthropicModels = [];
   // 直近に取得したモデル一覧（excluded/recommended フラグ付き）。
   // 「すべてのモデルを表示する」チェックボックスの切り替え時、API再取得なしで
   // 表示を切り替えるために保持する。
@@ -799,6 +810,199 @@
     return false;
   }
 
+  function getSelectedProviderOrder() {
+    const selected = document.querySelector(
+      'input[name="obp-provider-order"]:checked',
+    );
+    return selected ? selected.value : 'gemini';
+  }
+
+  function setSelectedProviderOrder(value) {
+    const valid = [
+      'anthropic,gemini',
+      'gemini',
+      'anthropic',
+      'gemini,anthropic',
+    ];
+    const order = valid.indexOf(value) !== -1 ? value : 'gemini';
+    document
+      .querySelectorAll('input[name="obp-provider-order"]')
+      .forEach((el) => {
+        el.checked = el.value === order;
+      });
+  }
+
+  function orderIncludes(order, type) {
+    return order.split(',').indexOf(type) !== -1;
+  }
+
+  function getThinkingSetting(type, order) {
+    if (!orderIncludes(order, type)) {
+      return config[type + '_thinking'] || DEFAULTS[type + '_thinking'];
+    }
+    const id =
+      type === 'anthropic'
+        ? 'obp-anthropic-thinking-default'
+        : 'obp-thinking-default';
+    return document.getElementById(id).checked ? 'default' : 'suppress';
+  }
+
+  function updateProviderBlockState() {
+    const order = getSelectedProviderOrder();
+    ['anthropic', 'gemini'].forEach((type) => {
+      const inactive = !orderIncludes(order, type);
+      document
+        .getElementById('obp-' + type + '-block')
+        .classList.toggle('obp-provider-inactive', inactive);
+      document.getElementById('obp-' + type + '-inactive-label').textContent =
+        inactive ? '（未使用）' : '';
+    });
+  }
+
+  function setAnthropicStatus(level, message) {
+    const el = document.getElementById('obp-anthropic-model-status');
+    el.className = 'obp-status-' + level;
+    el.textContent = message;
+  }
+
+  function toggleAnthropicManualMode(on) {
+    document.getElementById('obp-anthropic-model-select').disabled = on;
+    const manual = document.getElementById('obp-anthropic-model-manual');
+    manual.disabled = !on;
+    manual.style.display = on ? '' : 'none';
+  }
+
+  function getSelectedAnthropicModel() {
+    const manual = document.getElementById(
+      'obp-anthropic-model-manual-check',
+    ).checked;
+    const id = manual
+      ? 'obp-anthropic-model-manual'
+      : 'obp-anthropic-model-select';
+    return document.getElementById(id).value.trim();
+  }
+
+  function getVisibleAnthropicModels() {
+    if (document.getElementById('obp-anthropic-model-show-all').checked) {
+      return allFetchedAnthropicModels;
+    }
+    return allFetchedAnthropicModels.filter((m) => m.speedClass !== 'slow');
+  }
+
+  function buildAnthropicModelOptions(models) {
+    const select = document.getElementById('obp-anthropic-model-select');
+    select.innerHTML = '';
+    (models || []).forEach((m) => {
+      const id = typeof m === 'string' ? m : m.id;
+      const displayName = typeof m === 'string' ? m : m.displayName || id;
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent =
+        displayName + '（' + id + '）— ' + anthropic.getModelSpeedLabel(id);
+      select.appendChild(option);
+    });
+  }
+
+  function applyAnthropicSelection(preferredId) {
+    const select = document.getElementById('obp-anthropic-model-select');
+    const check = document.getElementById('obp-anthropic-model-manual-check');
+    const options = Array.prototype.map.call(select.options, (o) => o.value);
+    if (preferredId && options.indexOf(preferredId) !== -1) {
+      check.checked = false;
+      toggleAnthropicManualMode(false);
+      select.value = preferredId;
+    } else if (preferredId) {
+      check.checked = true;
+      toggleAnthropicManualMode(true);
+      document.getElementById('obp-anthropic-model-manual').value = preferredId;
+    } else {
+      check.checked = false;
+      toggleAnthropicManualMode(false);
+      select.value = '';
+    }
+  }
+
+  async function refreshAnthropicModelList() {
+    const apiKey = getEffectiveAnthropicKey();
+    const btn = document.getElementById('obp-anthropic-model-refresh');
+    if (!apiKey) {
+      setAnthropicStatus('loading', 'APIキーを入力してください');
+      return null;
+    }
+    const preferred = getSelectedAnthropicModel() || config.anthropic_model;
+    const seq = ++validationSeqAnthropic;
+    btn.disabled = true;
+    setAnthropicStatus('loading', 'モデル一覧を取得中…');
+    try {
+      const models = await anthropic.listModels(apiKey);
+      if (
+        seq !== validationSeqAnthropic ||
+        apiKey !== getEffectiveAnthropicKey()
+      )
+        return null;
+      allFetchedAnthropicModels = models;
+      buildAnthropicModelOptions(getVisibleAnthropicModels());
+      applyAnthropicSelection(preferred);
+      if (preferred && !models.some((m) => m.id === preferred)) {
+        showMessage(
+          'warn',
+          '保存済みのClaudeモデル（' +
+            preferred +
+            '）は一覧にありません。利用可否を確認してください。',
+        );
+      }
+    } catch (e) {
+      if (
+        seq !== validationSeqAnthropic ||
+        apiKey !== getEffectiveAnthropicKey()
+      )
+        return null;
+      allFetchedAnthropicModels = [];
+      buildAnthropicModelOptions([]);
+      applyAnthropicSelection(preferred);
+      showMessage(
+        'warn',
+        'Claudeモデル一覧の取得に失敗しました。確認済みのモデルIDを手入力し、利用可否を確認してください。' +
+          ((e.classified && e.classified.message) || e.message),
+      );
+    } finally {
+      btn.disabled = false;
+    }
+    return validateSelectedAnthropicModel();
+  }
+
+  async function validateSelectedAnthropicModel() {
+    const apiKey = getEffectiveAnthropicKey();
+    const model = getSelectedAnthropicModel();
+    const seq = ++validationSeqAnthropic;
+    lastValidation.anthropic = null;
+    if (!apiKey || !model) {
+      setAnthropicStatus('loading', '未確認');
+      return null;
+    }
+    setAnthropicStatus('loading', '確認中…');
+    const result = await anthropic.checkModelAvailability(apiKey, model);
+    if (
+      seq !== validationSeqAnthropic ||
+      apiKey !== getEffectiveAnthropicKey() ||
+      model !== getSelectedAnthropicModel()
+    )
+      return null;
+    lastValidation.anthropic = {
+      model: model,
+      key: apiKey,
+      level: result.level,
+      message: result.message,
+    };
+    if (result.level === 'ok')
+      setAnthropicStatus('ok', '✓ 利用可能（モデル情報の取得に成功）');
+    else if (result.level === 'ng')
+      setAnthropicStatus('ng', '✗ 利用不可: ' + result.message);
+    else
+      setAnthropicStatus('warn', '△ 確認できませんでした: ' + result.message);
+    return result;
+  }
+
   // 「すべてのモデルを表示する」の状態に応じて、select に流し込むモデル一覧を
   // 決定する。allFetchedModels 未取得時は FALLBACK_MODELS（文字列配列）を返す。
   function getVisibleModels() {
@@ -884,16 +1088,19 @@
     refreshBtn.disabled = true;
     setStatus('loading', 'モデル一覧を取得中…');
 
+    const seq = ++validationSeq;
     const preferred =
       getSelectedModelName() || config.gemini_model || DEFAULTS.gemini_model;
 
     try {
       const models = await client.listGenerateContentModels(apiKey);
+      if (seq !== validationSeq || apiKey !== getEffectiveApiKey()) return null;
       allFetchedModels = models;
       buildModelOptions(getVisibleModels());
       applySelection(preferred);
       checkSavedModelAvailability();
     } catch (e) {
+      if (seq !== validationSeq || apiKey !== getEffectiveApiKey()) return null;
       const msg = (e.classified && e.classified.message) || e.message;
       allFetchedModels = [];
       buildModelOptions(client.FALLBACK_MODELS);
@@ -904,9 +1111,9 @@
           msg +
           '）。既知のモデルのみを表示しています。必要に応じて「一覧にないモデル名を手入力する」をご利用ください。',
       );
+    } finally {
+      refreshBtn.disabled = false;
     }
-
-    refreshBtn.disabled = false;
     return validateSelectedModel();
   }
 
@@ -935,12 +1142,14 @@
     const modelName = getSelectedModelName();
 
     if (!apiKey || !modelName) {
-      lastValidation = null;
+      ++validationSeq;
+      lastValidation.gemini = null;
       setStatus('loading', '未確認');
       return null;
     }
 
     const seq = ++validationSeq;
+    lastValidation.gemini = null;
     setStatus('loading', '確認中…');
 
     // 設定画面では kintone.plugin.app.proxy() が使えないため、疎通確認は
@@ -948,7 +1157,11 @@
     // （generateContent は行わない）のみで判定する。
     const result = await client.checkModelAvailability(apiKey, modelName);
 
-    if (seq !== validationSeq) {
+    if (
+      seq !== validationSeq ||
+      apiKey !== getEffectiveApiKey() ||
+      modelName !== getSelectedModelName()
+    ) {
       return null;
     }
 
@@ -965,12 +1178,13 @@
       setStatus('warn', '△ 確認できませんでした: ' + result.message);
     }
 
-    lastValidation = {
+    lastValidation.gemini = {
       model: modelName,
+      key: apiKey,
       level: result.level,
       message: result.message,
     };
-    return lastValidation;
+    return lastValidation.gemini;
   }
 
   // =========================================================
@@ -1007,6 +1221,59 @@
     } catch {
       return { saved: false, masked: '', value: '' };
     }
+  }
+
+  function getSavedAnthropicKeyInfo() {
+    if (typeof kintone.plugin.app.getProxyConfig !== 'function')
+      return { saved: false, masked: '', value: '' };
+    try {
+      const proxy = kintone.plugin.app.getProxyConfig(
+        anthropic.MESSAGES_URL,
+        'POST',
+      );
+      const headers = (proxy && proxy.headers) || {};
+      const key = Object.keys(headers).find(
+        (name) => name.toLowerCase() === 'x-api-key',
+      );
+      const value = key && headers[key];
+      return value
+        ? { saved: true, masked: maskApiKey(value), value: String(value) }
+        : { saved: false, masked: '', value: '' };
+    } catch {
+      return { saved: false, masked: '', value: '' };
+    }
+  }
+
+  function getEffectiveAnthropicKey() {
+    return (
+      document.getElementById('obp-anthropic-api-key').value ||
+      savedAnthropicKeyValue
+    );
+  }
+
+  function updateAnthropicKeyStatusLabel() {
+    const el = document.getElementById('obp-anthropic-api-key-status');
+    el.textContent = savedAnthropicKeyExists
+      ? '✓ APIキーは設定済みです（' +
+        savedAnthropicKeyMasked +
+        '）。変更しない場合は空欄のまま保存してください。'
+      : 'APIキーは未設定です。Claudeを使う場合は入力してください。';
+    el.className =
+      'obp-api-key-status obp-api-key-status-' +
+      (savedAnthropicKeyExists ? 'saved' : 'empty');
+  }
+
+  function saveAnthropicProxyConfig(apiKey) {
+    return new Promise((resolve, reject) => {
+      kintone.plugin.app.setProxyConfig(
+        anthropic.MESSAGES_URL,
+        'POST',
+        { 'x-api-key': apiKey },
+        {},
+        resolve,
+        reject,
+      );
+    });
   }
 
   // 入力欄の値を優先し、未入力なら保存済みの実値を使う（直接通信用）
@@ -1053,40 +1320,68 @@
     });
   }
 
-  async function doSave() {
+  function settingsStillMatch(order, snapshot) {
+    return (
+      order === getSelectedProviderOrder() &&
+      snapshot.every(
+        (item) =>
+          item.key === item.provider.key() &&
+          item.model === item.provider.model(),
+      )
+    );
+  }
+
+  async function saveSelectedProxyKeys(order, snapshot) {
+    const anthropicKey = document.getElementById('obp-anthropic-api-key').value;
     const apiKey = document.getElementById('obp-api-key').value;
-    const modelName = getSelectedModelName();
+    if (orderIncludes(order, 'anthropic') && anthropicKey) {
+      if (!settingsStillMatch(order, snapshot)) return false;
+      try {
+        await saveAnthropicProxyConfig(anthropicKey);
+      } catch (e) {
+        showMessage(
+          'error',
+          'Claudeのプロキシ設定の保存に失敗しました。詳細: ' + e,
+        );
+        return false;
+      }
+      if (!settingsStillMatch(order, snapshot)) return false;
+      savedAnthropicKeyExists = true;
+      savedAnthropicKeyMasked = maskApiKey(anthropicKey);
+      savedAnthropicKeyValue = anthropicKey;
+      updateAnthropicKeyStatusLabel();
+    }
 
-    showMessage('info', '保存処理を実行しています…');
-
-    if (apiKey) {
+    if (orderIncludes(order, 'gemini') && apiKey) {
+      if (!settingsStillMatch(order, snapshot)) return false;
       try {
         await saveProxyConfig(apiKey);
       } catch (e) {
         showMessage('error', 'プロキシ設定の保存に失敗しました。詳細: ' + e);
-        return;
+        return false;
       }
+      if (!settingsStillMatch(order, snapshot)) return false;
       savedApiKeyExists = true;
       savedApiKeyMasked = maskApiKey(apiKey);
       savedApiKeyValue = apiKey;
       updateApiKeyStatusLabel();
     }
-    // apiKey が空文字のときは何もしない（既存のプロキシ設定をそのまま使う）
+    return true;
+  }
 
-    // 設定画面では kintone.plugin.app.proxy() が使えないため、保存時の確認も
-    // 直接通信で行う。直接通信できない環境では確認を諦めて保存を続行する。
-    const result = await client.checkModelAvailability(
-      getEffectiveApiKey(),
-      modelName,
-    );
-    if (result.level === 'ng') {
-      showMessage(
-        'warn',
-        '選択したモデルの疎通確認に失敗しました（' +
-          result.message +
-          '）。設定は保存しますが、レコード画面で動作しない可能性があります。',
-      );
+  async function doSave(order, snapshot) {
+    if (!settingsStillMatch(order, snapshot)) return;
+    showMessage('info', '保存処理を実行しています…');
+    if (!(await saveSelectedProxyKeys(order, snapshot))) {
+      if (!settingsStillMatch(order, snapshot)) {
+        showMessage(
+          'error',
+          '保存中に使用順・APIキーまたはモデルが変更されました。再度保存してください。',
+        );
+      }
+      return;
     }
+    // キー欄が空なら既存のプロキシ設定を保持する。
 
     checkPromptDraftWarnings();
     updateBackupCheck();
@@ -1120,7 +1415,16 @@
     }
 
     const newConfig = {
-      gemini_model: client.stripModelPrefix(modelName),
+      ...config,
+      ai_provider_order: order,
+      anthropic_model: orderIncludes(order, 'anthropic')
+        ? getSelectedAnthropicModel()
+        : config.anthropic_model || '',
+      anthropic_thinking: getThinkingSetting('anthropic', order),
+      pii_mask: document.getElementById('obp-pii-mask').checked ? 'yes' : 'no',
+      gemini_model: orderIncludes(order, 'gemini')
+        ? client.stripModelPrefix(getSelectedModelName())
+        : config.gemini_model || DEFAULTS.gemini_model,
       field_input: document.getElementById('obp-field-input').value,
       field_length: document.getElementById('obp-field-length').value,
       field_subject: document.getElementById('obp-field-subject').value,
@@ -1156,9 +1460,7 @@
         .checked
         ? 'no'
         : 'yes',
-      gemini_thinking: document.getElementById('obp-thinking-default').checked
-        ? 'default'
-        : 'suppress',
+      gemini_thinking: getThinkingSetting('gemini', order),
       preset_id: appliedPresetId || '',
       clear_input_after_draft: document.getElementById(
         'obp-clear-input-after-draft',
@@ -1175,15 +1477,82 @@
       btn_label_restore: document.getElementById('obp-btn-label-restore').value,
     };
 
+    if (!settingsStillMatch(order, snapshot)) {
+      showMessage(
+        'error',
+        '保存中にAPIキーまたはモデルが変更されました。再度保存してください。',
+      );
+      return;
+    }
     kintone.plugin.app.setConfig(newConfig, () => {
       alert('設定を保存しました。アプリを更新してください！');
       backToFlowScreen();
     });
   }
 
+  async function validateProvidersForSave(selected) {
+    for (const provider of selected) {
+      if (!provider.key() || !provider.model()) {
+        alert(provider.label + 'のAPIキーとモデルを指定してください。');
+        return false;
+      }
+    }
+    const warnings = [];
+    for (const provider of selected) {
+      const previous = lastValidation[provider.type];
+      if (
+        !previous ||
+        previous.key !== provider.key() ||
+        previous.model !== provider.model()
+      )
+        await provider.validate();
+      const current = lastValidation[provider.type];
+      if (
+        !current ||
+        current.key !== provider.key() ||
+        current.model !== provider.model()
+      ) {
+        alert(
+          provider.label +
+            'のモデルの疎通確認ができませんでした。APIキーとモデル名を確認してください。',
+        );
+        return false;
+      }
+      if (current.level === 'ng') {
+        alert(
+          provider.label + 'のモデルは利用できません。\n' + current.message,
+        );
+        return false;
+      }
+      if (current.level === 'warn')
+        warnings.push(provider.label + ': ' + current.message);
+    }
+    if (
+      warnings.length &&
+      !confirm(
+        'モデルの利用可否を確認できませんでした。このまま保存しますか？\n' +
+          warnings.join('\n'),
+      )
+    )
+      return false;
+    // 確認中に入力が変更された場合は古い結果で保存しない。
+    if (
+      selected.some(
+        (provider) =>
+          !lastValidation[provider.type] ||
+          lastValidation[provider.type].key !== provider.key() ||
+          lastValidation[provider.type].model !== provider.model(),
+      )
+    ) {
+      alert('APIキーまたはモデルが変更されました。再度保存してください。');
+      return false;
+    }
+
+    return true;
+  }
+
   async function onSaveClick() {
-    const apiKey = document.getElementById('obp-api-key').value;
-    const modelName = getSelectedModelName();
+    const order = getSelectedProviderOrder();
     const fieldInput = document.getElementById('obp-field-input').value;
     const fieldBody = document.getElementById('obp-field-body').value;
     const spaceDraft = getSpaceValue(
@@ -1191,15 +1560,9 @@
       document.getElementById('obp-space-draft-text'),
     );
 
-    if (
-      (!apiKey && !savedApiKeyValue) ||
-      !modelName ||
-      !fieldInput ||
-      !fieldBody ||
-      !spaceDraft
-    ) {
+    if (!fieldInput || !fieldBody || !spaceDraft) {
       alert(
-        '必須項目が未入力です。APIキー（初回のみ）・モデル・「AIへの指示・メモ」フィールド・本文フィールド・下書きボタン設置スペースをすべて指定してください。',
+        '必須項目が未入力です。「AIへの指示・メモ」フィールド・本文フィールド・下書きボタン設置スペースを指定してください。',
       );
       return;
     }
@@ -1224,41 +1587,38 @@
     // {{lengthInstruction}} / {{formatInstruction}} の欠落は警告のみで保存はブロックしない
     checkPromptDraftWarnings();
 
-    if (!lastValidation || lastValidation.model !== modelName) {
-      await validateSelectedModel();
-    }
-
-    if (!lastValidation) {
-      alert(
-        'モデルの疎通確認ができませんでした。APIキーとモデル名を確認してください。',
-      );
-      return;
-    }
-
-    if (lastValidation.level === 'ng') {
-      alert(
-        '選択したモデルはこのAPIキーでは利用できません。別のモデルを選択してください。\n' +
-          lastValidation.message,
-      );
-      return;
-    }
-
-    if (lastValidation.level === 'warn') {
-      const proceed = confirm(
-        'モデルの利用可否を確認できませんでした。このまま保存しますか？\n' +
-          lastValidation.message,
-      );
-      if (!proceed) {
-        return;
-      }
-    }
+    const selected = [];
+    if (orderIncludes(order, 'anthropic'))
+      selected.push({
+        type: 'anthropic',
+        label: 'Claude',
+        key: getEffectiveAnthropicKey,
+        model: getSelectedAnthropicModel,
+        validate: validateSelectedAnthropicModel,
+      });
+    if (orderIncludes(order, 'gemini'))
+      selected.push({
+        type: 'gemini',
+        label: 'Gemini',
+        key: getEffectiveApiKey,
+        model: getSelectedModelName,
+        validate: validateSelectedModel,
+      });
+    if (!(await validateProvidersForSave(selected))) return;
 
     const saveBtn = document.getElementById('obp-save');
     const originalLabel = saveBtn.textContent;
     saveBtn.disabled = true;
     saveBtn.textContent = '保存中…';
     try {
-      await doSave();
+      await doSave(
+        order,
+        selected.map((provider) => ({
+          provider: provider,
+          key: provider.key(),
+          model: provider.model(),
+        })),
+      );
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = originalLabel;
@@ -1301,6 +1661,53 @@
 
   function backToFlowScreen() {
     window.location.href = '../../flow?app=' + kintone.app.getId();
+  }
+
+  function bindAnthropicEvents() {
+    const key = document.getElementById('obp-anthropic-api-key');
+    const toggle = document.getElementById('obp-anthropic-api-key-toggle');
+    const select = document.getElementById('obp-anthropic-model-select');
+    const manual = document.getElementById('obp-anthropic-model-manual');
+    const check = document.getElementById('obp-anthropic-model-manual-check');
+    toggle.addEventListener('click', () => {
+      const visible = key.type === 'password';
+      key.type = visible ? 'text' : 'password';
+      toggle.textContent = visible ? '隠す' : '表示';
+    });
+    key.addEventListener('input', () => {
+      ++validationSeqAnthropic;
+      lastValidation.anthropic = null;
+    });
+    key.addEventListener('change', () => {
+      if (getEffectiveAnthropicKey()) refreshAnthropicModelList();
+    });
+    document
+      .getElementById('obp-anthropic-model-refresh')
+      .addEventListener('click', refreshAnthropicModelList);
+    select.addEventListener('change', validateSelectedAnthropicModel);
+    manual.addEventListener('input', () => {
+      ++validationSeqAnthropic;
+      lastValidation.anthropic = null;
+    });
+    manual.addEventListener('blur', () => {
+      if (check.checked) validateSelectedAnthropicModel();
+    });
+    check.addEventListener('change', () => {
+      toggleAnthropicManualMode(check.checked);
+      validateSelectedAnthropicModel();
+    });
+    document
+      .getElementById('obp-anthropic-model-show-all')
+      .addEventListener('change', () => {
+        const current = getSelectedAnthropicModel();
+        buildAnthropicModelOptions(getVisibleAnthropicModels());
+        applyAnthropicSelection(current);
+      });
+    document
+      .querySelectorAll('input[name="obp-provider-order"]')
+      .forEach((el) => {
+        el.addEventListener('change', updateProviderBlockState);
+      });
   }
 
   function bindEvents() {
@@ -1350,7 +1757,8 @@
     });
 
     apiKeyEl.addEventListener('change', () => {
-      lastValidation = null;
+      ++validationSeq;
+      lastValidation.gemini = null;
       if (apiKeyEl.value || savedApiKeyValue) {
         refreshModelList();
       }
@@ -1465,9 +1873,41 @@
     cancelBtn.addEventListener('click', () => {
       backToFlowScreen();
     });
+    bindAnthropicEvents();
+  }
+
+  function initProviderSettings() {
+    const savedAnthropicInfo = getSavedAnthropicKeyInfo();
+    savedAnthropicKeyExists = savedAnthropicInfo.saved;
+    savedAnthropicKeyMasked = savedAnthropicInfo.masked;
+    savedAnthropicKeyValue = savedAnthropicInfo.value;
+    updateAnthropicKeyStatusLabel();
+    const initialOrder =
+      config.ai_provider_order ||
+      (Object.keys(config).length === 0 || savedAnthropicKeyExists
+        ? DEFAULTS.ai_provider_order
+        : 'gemini');
+    setSelectedProviderOrder(initialOrder);
+    updateProviderBlockState();
+    document.getElementById('obp-pii-mask').checked = config.pii_mask !== 'no';
+    document.getElementById(
+      config.anthropic_thinking === 'default'
+        ? 'obp-anthropic-thinking-default'
+        : 'obp-anthropic-thinking-suppress',
+    ).checked = true;
+    buildAnthropicModelOptions([]);
+    applyAnthropicSelection(config.anthropic_model || '');
+    toggleManualMode(false);
+    if (savedAnthropicKeyValue) refreshAnthropicModelList();
+    else
+      setAnthropicStatus(
+        'loading',
+        'APIキーを入力するとモデル一覧を取得します',
+      );
   }
 
   function init() {
+    initProviderSettings();
     document.getElementById('obp-btn-label-draft').value =
       config.btn_label_draft || DEFAULTS.btn_label_draft;
     document.getElementById('obp-btn-label-summary').value =
@@ -1525,8 +1965,6 @@
       ? ''
       : 'none';
 
-    toggleManualMode(false);
-
     populatePresetSelect();
     updatePresetCurrentLabel();
     populateFormatSelect();
@@ -1551,7 +1989,7 @@
       // 保存済みキーがあるので、開いた時点で最新のモデル一覧を取得する
       setStatus('loading', 'モデル一覧を取得中…');
       refreshModelList();
-    } else {
+    } else if (orderIncludes(getSelectedProviderOrder(), 'gemini')) {
       setStatus('loading', 'APIキーを入力するとモデル一覧を取得します');
       showMessage(
         'info',

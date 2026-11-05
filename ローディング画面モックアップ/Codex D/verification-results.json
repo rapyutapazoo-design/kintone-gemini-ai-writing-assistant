@@ -1,0 +1,19 @@
+{
+  "checks": [
+    "bloom theme selected",
+    "orbit theme selected",
+    "draft theme selected",
+    "Completion state",
+    "Cancellation state",
+    "Restart state",
+    "Animation paused",
+    "Mobile no horizontal overflow",
+    "Mobile card fully visible",
+    "320px no horizontal overflow",
+    "Reduced motion respected",
+    "Timed phase progression",
+    "Automatic completion",
+    "No JavaScript errors"
+  ],
+  "errors": []
+}

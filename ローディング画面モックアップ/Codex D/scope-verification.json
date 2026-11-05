@@ -1,0 +1,12 @@
+{
+  "files_checked": 49,
+  "changed": [
+    ".DS_Store"
+  ],
+  "added": [],
+  "excluded": [
+    ".git",
+    "node_modules",
+    "ローディング画面モックアップ"
+  ]
+}

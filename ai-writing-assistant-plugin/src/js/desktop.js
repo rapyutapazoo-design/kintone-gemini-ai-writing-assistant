@@ -6,6 +6,8 @@
   const client = window.GeminiPluginClient;
   const genOpts = window.GeminiGenerationOptions;
   const backup = window.GeminiPromptBackup;
+  const router = window.AiProviderRouter;
+  const piiMask = window.AiPiiMask;
 
   const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
 以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
@@ -32,9 +34,10 @@
 【本文】
 {{body}}`;
 
-  const GEMINI_MODEL = config.gemini_model || client.DEFAULT_MODEL;
-  // 保存済み設定にキーが無い場合も抑制（既定）になる。
-  const THINKING_MODE = client.normalizeThinkingMode(config.gemini_thinking);
+  // 使用するAIの順番（ai_provider_order が無ければ Gemini のみ＝従来の挙動）。
+  const PROVIDER_PLAN = router.buildProviderPlan(config);
+  // 個人情報の自動伏せ字（キーが無い既存アプリも ON）。
+  const PII_MASK_ON = (config.pii_mask || 'yes') !== 'no';
   const F_INPUT = config.field_input || 'keyword_input';
   const F_LENGTH =
     config.field_length === undefined ? 'length_option' : config.field_length;
@@ -50,8 +53,8 @@
   const SPACE_DRAFT = config.space_draft || 'btn_space_draft';
   const SPACE_SUMMARY = config.space_summary || 'btn_space_summary';
   const SUMMARY_ON = (config.summary_enabled || 'yes') !== 'no';
-  const LABEL_DRAFT = config.btn_label_draft || 'Geminiで件名・本文を作成';
-  const LABEL_SUMMARY = config.btn_label_summary || 'Geminiで要約';
+  const LABEL_DRAFT = config.btn_label_draft || 'AIで件名・本文を作成';
+  const LABEL_SUMMARY = config.btn_label_summary || 'AIで要約';
   const PROMPT_DRAFT = config.prompt_draft || DEFAULT_PROMPT_DRAFT;
   const PROMPT_SUMMARY = config.prompt_summary || DEFAULT_PROMPT_SUMMARY;
 
@@ -117,7 +120,7 @@
   // =========================================================
   // 1. デザイン定義
   // =========================================================
-  const GEMINI_LOGO_SVG = `
+  const AI_LOGO_SVG = `
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: text-bottom; margin-right: 8px;">
         <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="#fff"/>
     </svg>`;
@@ -212,6 +215,16 @@
     'mobile.app.record.detail.show',
   ];
 
+  // 入力欄の近くに出す個人情報の注意書き（デスクトップ・モバイル共通）。
+  function buildPiiWarning() {
+    const box = document.createElement('div');
+    box.className = 'obp-pii-warning';
+    box.textContent = PII_MASK_ON
+      ? '個人情報（氏名・住所・電話番号・部屋番号など）は入力しないでください。電話番号・メールアドレス・郵便番号・○○号室は送信前に自動で伏せ字になりますが、氏名・住所は対象外です。'
+      : '個人情報（氏名・住所・電話番号・メールアドレス・部屋番号など）は入力しないでください。入力内容はそのまま外部のAIサービスへ送信されます。';
+    return box;
+  }
+
   kintone.events.on(EVENTS_EDIT, function (event) {
     // kintone の SPA 遷移では前画面の cleanup() が呼ばれないことがあるため、
     // 復元モーダルのオーバーレイが残っていればここで除去する（軽微5）。
@@ -223,9 +236,10 @@
 
     if (space) {
       space.innerHTML = '';
+      space.appendChild(buildPiiWarning());
 
       const btn = document.createElement('button');
-      btn.innerHTML = GEMINI_LOGO_SVG + LABEL_DRAFT;
+      btn.innerHTML = AI_LOGO_SVG + LABEL_DRAFT;
       btn.style = BTN_STYLE;
       if (isMobile) {
         btn.style.width = '100%';
@@ -255,7 +269,7 @@
     space.innerHTML = '';
 
     const btnSummary = document.createElement('button');
-    btnSummary.innerHTML = GEMINI_LOGO_SVG + LABEL_SUMMARY;
+    btnSummary.innerHTML = AI_LOGO_SVG + LABEL_SUMMARY;
     btnSummary.style = BTN_STYLE;
     btnSummary.style.padding = '8px 16px';
     if (isMobile) {
@@ -435,8 +449,11 @@
       return;
     }
 
+    // 伏せ字は送信用の差し込み変数だけに適用する（keyword 自体は退避・復元用に
+    // 元のまま使う）。
+    const masked = maskForSend({ input: keyword }, ['input']);
     const prompt = renderTemplate(PROMPT_DRAFT, {
-      input: keyword,
+      input: masked.vars.input,
       lengthInstruction: resolveLengthInstruction(
         lengthOption,
         recordData.record,
@@ -447,9 +464,14 @@
     showSpinner();
 
     try {
-      const result = await callGeminiAPI(prompt, true);
+      const result = await callAI(prompt, true);
       const rawText = result.text;
       const data = client.tryParseJsonPayload(rawText);
+      if (!router.parseDraftJson(rawText)) {
+        throw new Error(
+          '件名と本文を含むJSON形式の応答を取得できませんでした。',
+        );
+      }
 
       const currentRecord = appManager.record.get();
       readFieldValue(currentRecord.record, F_BODY);
@@ -481,19 +503,13 @@
       // 復元ボタンを再描画する（重要2）。
       renderRestoreButton(currentRecord.record, isMobile, appManager);
 
-      if (result.fallbackReason) {
-        console.info(
-          'Gemini fallback: ' +
-            result.fallbackReason +
-            ' ' +
-            GEMINI_MODEL +
-            ' -> ' +
-            result.modelUsed,
-        );
-        showNotice(buildFallbackNoticeText(result) + '内容をご確認ください。');
-      }
+      logResult(result, masked.total);
+      showNotice(buildSuccessNoticeText(result, masked));
     } catch (error) {
-      console.error(error);
+      console.error('[AI文章作成] 生成失敗', {
+        kind: error.kind,
+        attempts: error.attempts,
+      });
       alert(buildApiErrorMessage('生成', error));
     } finally {
       hideSpinner();
@@ -510,12 +526,13 @@
       return;
     }
 
-    const prompt = renderTemplate(PROMPT_SUMMARY, { body: opinion });
+    const masked = maskForSend({ body: opinion }, ['body']);
+    const prompt = renderTemplate(PROMPT_SUMMARY, { body: masked.vars.body });
 
     showSpinner();
 
     try {
-      const result = await callGeminiAPI(prompt, false);
+      const result = await callAI(prompt, false);
       const resultText = result.text;
       const body = { app: appId, id: recordId, record: {} };
       body.record[F_SUMMARY] = {
@@ -526,56 +543,127 @@
       };
       await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body);
       let doneMessage = '要約が完了しました。ページを更新します。';
-      if (result.fallbackReason) {
-        console.info(
-          'Gemini fallback: ' +
-            result.fallbackReason +
-            ' ' +
-            GEMINI_MODEL +
-            ' -> ' +
-            result.modelUsed,
-        );
-        doneMessage += '\n' + buildFallbackNoticeText(result);
-      }
+      logResult(result, masked.total);
+      doneMessage += '\n' + buildSuccessNoticeText(result, masked);
       alert(doneMessage);
       location.reload();
     } catch (error) {
-      console.error(error);
+      console.error('[AI文章作成] 要約失敗', {
+        kind: error.kind,
+        attempts: error.attempts,
+      });
       alert(buildApiErrorMessage('要約', error));
     } finally {
       hideSpinner();
     }
   }
 
-  // フォールバック生成時にどのモデルで作成したかを伝える文。
-  function buildFallbackNoticeText(result) {
-    const lead =
-      result.fallbackReason === 'timeout'
-        ? 'Geminiの応答に時間がかかったため、'
-        : 'Geminiが混雑していたため、';
-    return (
-      lead +
-      '軽量モデル「' +
-      result.modelUsed +
-      '」で作成しました（通常は「' +
-      GEMINI_MODEL +
-      '」）。'
-    );
+  // 伏せ字が OFF のときは何も変えずに件数0を返す。
+  function maskForSend(vars, keys) {
+    if (PII_MASK_ON) {
+      return piiMask.maskVars(vars, keys);
+    }
+    return { vars: vars, counts: piiMask.emptyCounts(), total: 0 };
+  }
+
+  // 予備のAIへ切り替えた理由（「Claudeが〜ため」の〜部分）。
+  const FALLBACK_REASON_PHRASES = {
+    timeout: '応答しなかった',
+    busy: '混雑していた',
+    auth: '認証に失敗した（管理者は設定をご確認ください）',
+    refusal: '応答を拒否した',
+  };
+
+  // 成功時に毎回出す通知。どのAI・モデルで作成したか、切替の有無、伏せ字の件数を伝える。
+  function buildSuccessNoticeText(result, masked) {
+    const lines = [
+      '作成しました：' +
+        result.label +
+        '（' +
+        result.model +
+        '）・' +
+        (result.elapsedMs / 1000).toFixed(1) +
+        '秒',
+    ];
+    if (result.fallbackFrom) {
+      lines.push(
+        result.fallbackFrom +
+          'が' +
+          (FALLBACK_REASON_PHRASES[result.fallbackReason] || 'エラーになった') +
+          'ため' +
+          result.label +
+          'で作成しました。',
+      );
+    }
+    if (result.geminiFallbackModel) {
+      lines.push(
+        (result.geminiFallbackReason === 'timeout'
+          ? 'Geminiの応答に時間がかかったため、'
+          : 'Geminiが混雑していたため、') +
+          '軽量モデル「' +
+          result.geminiFallbackModel +
+          '」で作成しました（通常は「' +
+          result.primaryModel +
+          '」）。',
+      );
+    }
+    if (masked && masked.total > 0) {
+      lines.push(
+        '伏せ字：' +
+          piiMask.formatSummary(masked.counts) +
+          '（必要に応じて手で補ってください）',
+      );
+    }
+    lines.push('内容をご確認ください。');
+    return lines.join('\n');
+  }
+
+  // 実行結果の記録。プロンプトや本文は出さない。
+  function logResult(result, maskedTotal) {
+    console.info('[AI文章作成]', {
+      provider: result.provider,
+      model: result.model,
+      elapsedMs: result.elapsedMs,
+      attempts: result.attempts,
+      maskedTotal: maskedTotal,
+    });
+    const authFailed = result.attempts.find((a) => a.kind === 'auth');
+    if (result.fallbackFrom && authFailed) {
+      console.warn(
+        '[AI文章作成] ' +
+          authFailed.label +
+          'の設定に問題がある可能性があります',
+        result.attempts,
+      );
+    }
   }
 
   // API失敗時のalertメッセージを組み立てる。
-  // 503/500/429（Gemini側の一時的な混雑・レート上限）、status:0（無応答）、
+  // 503/500/429（AI側の一時的な混雑・レート上限）、status:0（無応答）、
   // GAIA_PR03（kintoneプロキシのタイムアウト）、status:-1（通信エラー）では
   // 「APIキーが設定されているか確認してください」という誤誘導を出さない。
   function buildApiErrorMessage(prefix, error) {
+    const attempts = error.attempts || [];
+    const lastAttempt = attempts[attempts.length - 1];
+    const providerLabel =
+      (error.provider &&
+        router.PROVIDERS[error.provider] &&
+        router.PROVIDERS[error.provider].label) ||
+      'AI';
+    const summaryLine =
+      attempts.length >= 2
+        ? '試行結果：' + router.summarizeAttempts(attempts) + '\n'
+        : '';
     const isNotFound =
       (error.classified && error.classified.code === 'NOT_FOUND') ||
       /404/.test(error.message);
     if (isNotFound) {
       return (
         prefix +
-        'に失敗しました。選択中のモデル（' +
-        (error.primaryModel || GEMINI_MODEL) +
+        'に失敗しました。\n' +
+        summaryLine +
+        '選択中のモデル（' +
+        (error.primaryModel || (lastAttempt && lastAttempt.model) || '') +
         '）が利用できません。プラグイン設定画面でモデルを選び直してください。\n' +
         error.message
       );
@@ -591,7 +679,10 @@
       ' ' +
       String((error.classified && error.classified.message) || '')
     ).toLowerCase();
-    const isGaiaTimeout = status === 0 || haystack.indexOf('gaia_pr03') !== -1;
+    const isGaiaTimeout =
+      error.kind === 'timeout' ||
+      status === 0 ||
+      haystack.indexOf('gaia_pr03') !== -1;
     if (isGaiaTimeout) {
       const guide = fallbackTried
         ? '軽量モデル（' +
@@ -600,7 +691,10 @@
         : '少し時間をおいて再実行してください。改善しない場合は、プラグイン設定の「AIの思考（thinking）」で「抑制する」が選ばれ、高速モデルが選ばれているか管理者にご確認ください。';
       return (
         prefix +
-        'に失敗しました。\nGeminiの応答がkintoneの制限時間内に返りませんでした。' +
+        'に失敗しました。\n' +
+        summaryLine +
+        providerLabel +
+        'の応答がkintoneの制限時間内に返りませんでした。' +
         guide +
         '\n' +
         error.message
@@ -610,7 +704,9 @@
     if (status === -1) {
       return (
         prefix +
-        'に失敗しました。\nネットワークまたはブラウザ側の制限により通信できませんでした。通信環境をご確認のうえ、再度お試しください。\n' +
+        'に失敗しました。\n' +
+        summaryLine +
+        'ネットワークまたはブラウザ側の制限により通信できませんでした。通信環境をご確認のうえ、再度お試しください。\n' +
         error.message
       );
     }
@@ -618,7 +714,14 @@
     if (status === 429) {
       return (
         prefix +
-        'に失敗しました。\nGemini APIの利用上限（レート上限）に達した可能性があります。時間をおいて再度お試しください。続く場合は、管理者がGoogle AI Studioで利用状況と上限をご確認ください。\n' +
+        'に失敗しました。\n' +
+        summaryLine +
+        providerLabel +
+        ' APIの利用上限（レート上限）に達した可能性があります。時間をおいて再度お試しください。続く場合は、管理者が' +
+        (providerLabel === 'Claude'
+          ? 'Anthropic Console'
+          : 'Google AI Studio') +
+        'で利用状況と上限をご確認ください。\n' +
         error.message
       );
     }
@@ -626,7 +729,10 @@
     if (status === 503 || status === 500) {
       return (
         prefix +
-        'に失敗しました。\nGemini側が一時的に混雑しています。\n自動で再試行し' +
+        'に失敗しました。\n' +
+        summaryLine +
+        providerLabel +
+        '側が一時的に混雑しています。\n自動で再試行し' +
         (fallbackTried
           ? '、軽量モデル（' + error.fallbackModel + '）にも切り替え'
           : '') +
@@ -635,84 +741,54 @@
       );
     }
 
+    // APIキーの案内は認証エラーのときだけ出す。
+    const keyProblem = attempts.some((a) => a.kind === 'auth');
     return (
       prefix +
-      'に失敗しました。\nAPIキーが設定されているか確認してください。\n' +
+      'に失敗しました。\n' +
+      summaryLine +
+      (keyProblem
+        ? 'APIキーが設定されているか確認してください。\n'
+        : '時間をおいて再度お試しください。\n') +
       error.message
     );
   }
 
-  // 戻り値: { text, modelUsed, fallbackReason }
-  function callGeminiAPI(prompt, requireJson = true) {
-    const data = {
-      contents: [{ parts: [{ text: prompt }] }],
-    };
-
-    if (requireJson) {
-      data.generationConfig = { responseMimeType: 'application/json' };
-    }
-
-    // maxOutputTokens は付けない（思考トークンが上限に含まれ、本文切れや
-    // JSON解析失敗を招く恐れがあるため）。
-    return client
-      .generateContentWithFallback(PLUGIN_ID, {
-        model: GEMINI_MODEL,
-        body: data,
-        thinkingMode: THINKING_MODE,
-        onProgress: (ev) => {
-          if (ev.type === 'retry') {
-            setSpinnerText(
-              '混雑のため再試行しています…（' +
-                ev.attempt +
-                '/' +
-                ev.total +
-                '）',
-            );
-          } else if (ev.type === 'fallback') {
-            setSpinnerText(
-              ev.reason === 'timeout'
-                ? '応答に時間がかかったため、軽量モデル（' +
-                    ev.model +
-                    '）で再試行しています…'
-                : '混雑のため軽量モデル（' +
-                    ev.model +
-                    '）に切り替えて再試行しています…',
-            );
-          } else if (ev.type === 'thinking_retry') {
-            setSpinnerText('設定を調整して再送しています…');
-          }
-        },
-      })
-      .then((result) => {
-        const { status, body } = result;
-        if (status >= 200 && status < 300) {
-          let json;
-          try {
-            json = JSON.parse(body);
-          } catch {
-            throw new Error('レスポンスの解析に失敗しました。');
-          }
-          const text = client.extractText(json);
-          if (!text) {
-            throw new Error('AIからの応答が空でした。');
-          }
-          return {
-            text: text,
-            modelUsed: result.modelUsed,
-            fallbackReason: result.fallbackReason,
-          };
+  // 設定された順番でAIを呼び出す（ルーター経由）。
+  // 戻り値: { text, provider, label, model, elapsedMs, attempts, fallbackFrom, ... }
+  function callAI(prompt, requireJson = true) {
+    return router.generateText(PLUGIN_ID, {
+      plan: PROVIDER_PLAN,
+      prompt: prompt,
+      requireJson: requireJson,
+      onProgress: (ev) => {
+        if (ev.type === 'provider_fallback') {
+          setSpinnerText(
+            ev.from + 'が応答しないため' + ev.to + 'で再試行しています…',
+          );
+        } else if (ev.type === 'retry') {
+          setSpinnerText(
+            '混雑のため再試行しています…（' +
+              ev.attempt +
+              '/' +
+              ev.total +
+              '）',
+          );
+        } else if (ev.type === 'fallback') {
+          setSpinnerText(
+            ev.reason === 'timeout'
+              ? '応答に時間がかかったため、軽量モデル（' +
+                  ev.model +
+                  '）で再試行しています…'
+              : '混雑のため軽量モデル（' +
+                  ev.model +
+                  '）に切り替えて再試行しています…',
+          );
+        } else if (ev.type === 'thinking_retry') {
+          setSpinnerText('設定を調整して再送しています…');
         }
-        const c = client.classifyError(status, client.safeParseJson(body));
-        const err = new Error('API Error ' + status + ': ' + c.message);
-        err.classified = c;
-        err.responseBody = String(body == null ? '' : body);
-        err.primaryModel = result.primaryModel;
-        err.fallbackModel = result.fallbackModel;
-        err.fallbackStatus = result.fallbackResult
-          ? result.fallbackResult.status
-          : undefined;
-        throw err;
-      });
+      },
+    });
   }
 
   // =========================================================
@@ -992,7 +1068,7 @@
     const text = document.createElement('div');
     text.id = 'kintone-spinner-text';
     text.className = 'spinner-text';
-    text.innerText = 'Geminiが思考中です...';
+    text.innerText = 'AIが文章を作成中です…';
     overlay.appendChild(container);
     overlay.appendChild(text);
     document.body.appendChild(overlay);
