@@ -409,7 +409,10 @@
           '<svg class="spark" viewBox="0 0 100 100" aria-hidden="true">' +
           SPARK_8 +
           '</svg>' +
-          TEXT_DIV
+          TEXT_DIV +
+          '<div class="obp-ld-stream obp-ld-stream-light" style="max-width:460px;margin-top:24px;font-size:13px;line-height:1.7"><span>' +
+          STREAM_TEXT +
+          '</span></div>'
         );
       },
       'claude-b': function () {
@@ -425,13 +428,19 @@
           '<div class="line l1"></div><div class="line l2"></div><div class="line l3"></div><div class="line l4"></div>' +
           '<div class="line l5"></div>' +
           '<div class="pen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div></div>' +
-          TEXT_DIV
+          TEXT_DIV +
+          '<div class="obp-ld-stream obp-ld-stream-light" style="max-width:460px;margin-top:24px;font-size:13px;line-height:1.7"><span>' +
+          STREAM_TEXT +
+          '</span></div>'
         );
       },
       'claude-d': function () {
         return (
           '<canvas></canvas><div class="core"><div class="orb"></div>' +
           TEXT_DIV +
+          '<div class="obp-ld-stream obp-ld-stream-dark" style="max-width:460px;margin-top:24px;font-size:13px;line-height:1.7"><span>' +
+          STREAM_TEXT +
+          '</span></div>' +
           '</div>'
         );
       },
@@ -500,14 +509,26 @@
     //  stream: ストリーミング風表示の文章と、書き終えてから次の文までの待ち文字数
     const BEHAVIOR = {
       classic: { rotate: false, suffix: '' },
-      'claude-a': { rotate: true, suffix: '' },
+      'claude-a': {
+        rotate: true,
+        suffix: '',
+        stream: { sentences: STREAMS_CLAUDE_B, tail: 20 },
+      },
       'claude-b': {
         rotate: true,
         suffix: '…',
         stream: { sentences: STREAMS_CLAUDE_B, tail: 20 },
       },
-      'claude-c': { rotate: true, suffix: '…' },
-      'claude-d': { rotate: true, suffix: '…' },
+      'claude-c': {
+        rotate: true,
+        suffix: '…',
+        stream: { sentences: STREAMS_CLAUDE_B, tail: 20 },
+      },
+      'claude-d': {
+        rotate: true,
+        suffix: '…',
+        stream: { sentences: STREAMS_CLAUDE_B, tail: 20 },
+      },
       'gemini-a': {
         rotate: true,
         suffix: '...',
