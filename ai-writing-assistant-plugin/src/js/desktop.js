@@ -153,16 +153,6 @@
     'mobile.app.record.detail.show',
   ];
 
-  // 入力欄の近くに出す個人情報の注意書き（デスクトップ・モバイル共通）。
-  function buildPiiWarning() {
-    const box = document.createElement('div');
-    box.className = 'obp-pii-warning';
-    box.textContent = PII_MASK_ON
-      ? '個人情報（氏名・住所・電話番号・部屋番号など）は入力しないでください。電話番号・メールアドレス・郵便番号・○○号室は送信前に自動で伏せ字になりますが、氏名・住所は対象外です。'
-      : '個人情報（氏名・住所・電話番号・メールアドレス・部屋番号など）は入力しないでください。入力内容はそのまま外部のAIサービスへ送信されます。';
-    return box;
-  }
-
   kintone.events.on(EVENTS_EDIT, function (event) {
     // kintone の SPA 遷移では前画面の cleanup() が呼ばれないことがあるため、
     // 復元モーダルのオーバーレイが残っていればここで除去する（軽微5）。
@@ -174,7 +164,6 @@
 
     if (space) {
       space.innerHTML = '';
-      space.appendChild(buildPiiWarning());
 
       const btn = document.createElement('button');
       if (BUTTON_DESIGN) {
