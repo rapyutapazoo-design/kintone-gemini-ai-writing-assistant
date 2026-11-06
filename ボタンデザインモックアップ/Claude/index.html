@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生成ボタン Claude風 モックアップ</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; color: #333; background: linear-gradient(#fff 0, #f2f2f2 100%) fixed; }
+  header { padding: 18px 24px; border-bottom: 1px solid #e3e3e3; background: #fff; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0 16px 0 0; }
+  .tg { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tg.on { background: #333; color: #fff; border-color: #333; }
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  section { background: #fff; border: 1px solid #e3e3e3; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  section h2 { font-size: 15px; margin: 0 0 4px; }
+  section p { font-size: 12.5px; color: #666; margin: 0 0 14px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+  .bt { white-space: nowrap; }
+  .cell { min-width: 0; }
+  .cell small { display: block; font-size: 11px; color: #777; margin-bottom: 6px; }
+  .cell .frame { padding: 14px; background: linear-gradient(#fff, #f5f5f5); border: 1px dashed #ddd; border-radius: 6px; }
+  body.mobile .row { grid-template-columns: 1fr; max-width: 390px; }
+  body.mobile .bt { width: 100%; }
+  @media (max-width: 900px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* ============ 現行（Gemini・比較用） ============ */
+  .bt-cur { display: flex; align-items: center; justify-content: center; padding: 10px 20px; color: #fff;
+    background: linear-gradient(135deg, #4285F4 0%, #2962FF 100%); border: none; border-radius: 20px;
+    cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-family: inherit; }
+  .bt-cur:disabled { opacity: .6; cursor: progress; }
+  .bt-cur:focus-visible, .bt-cur.is-focus { outline: 2px solid #2962FF; outline-offset: 2px; }
+  .bt-cur:hover:not(:disabled), .bt-cur.is-hover { filter: brightness(1.08); }
+
+  .sp { flex: none; margin-right: 8px; vertical-align: text-bottom; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============ A: テラコッタ塗り ============ */
+  .bt-a { display: flex; align-items: center; justify-content: center; padding: 10px 20px; color: #fff;
+    background: linear-gradient(180deg, #BA5532 0%, #A64A2A 100%); border: none; border-radius: 10px;
+    cursor: pointer; font-weight: bold; font-size: 14px; font-family: inherit; letter-spacing: .02em;
+    box-shadow: 0 1px 2px rgba(80,30,10,.35), inset 0 1px 0 rgba(255,255,255,.15);
+    transition: background .15s, box-shadow .15s, transform .1s; }
+  .bt-a:hover, .bt-a.is-hover { background: linear-gradient(180deg, #A64A2A 0%, #8F3F20 100%); box-shadow: 0 3px 8px rgba(80,30,10,.35); }
+  .bt-a:active, .bt-a.is-active { background: #8F3F20; box-shadow: inset 0 2px 4px rgba(0,0,0,.3); transform: translateY(1px); }
+  .bt-a:disabled { background: #A64A2A; cursor: progress; box-shadow: none; transform: none; }
+  .bt-a:focus-visible, .bt-a.is-focus { outline: 3px solid #3D3929; outline-offset: 2px; }
+  .bt-a:disabled .sp, .bt-b:disabled .sp, .bt-c:disabled .sp, .bt-d:disabled .sp { animation: spin 6s linear infinite; }
+
+  /* ============ B: クリーム地 + テラコッタ枠線 ============ */
+  .bt-b { display: flex; align-items: center; justify-content: center; padding: 9px 20px; color: #8F3F20;
+    background: #FAF9F5; border: 1.5px solid #C6613F; border-radius: 999px;
+    cursor: pointer; font-weight: bold; font-size: 14px; font-family: inherit;
+    transition: background .15s, box-shadow .15s; }
+  .bt-b .sp { width: 16px; height: 16px; transition: transform .6s; }
+  .bt-b:hover, .bt-b.is-hover { background: #F3E3D3; box-shadow: 0 2px 6px rgba(198,97,63,.25); }
+  .bt-b:hover:not(:disabled) .sp, .bt-b.is-hover .sp { transform: rotate(90deg); }
+  .bt-b:active, .bt-b.is-active { background: #EBD2BC; box-shadow: none; }
+  .bt-b:disabled { background: #FAF9F5; cursor: progress; box-shadow: none; border-style: dashed; }
+  .bt-b:focus-visible, .bt-b.is-focus { outline: 3px solid #3D3929; outline-offset: 2px; }
+
+  /* ============ C: ダーク + ホバーでシマー ============ */
+  .bt-c { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 10px 20px; color: #F0EEE6;
+    background: #262624; border: 1px solid #3A3836; border-radius: 12px;
+    cursor: pointer; font-weight: bold; font-size: 14px; font-family: inherit;
+    box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: background .15s, border-color .15s; }
+  .bt-c .sp { color: #D97757; }
+  .bt-c::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.14), transparent); transform: skewX(-20deg); opacity: 0; pointer-events: none; }
+  .bt-c:hover, .bt-c.is-hover { background: #30302E; border-color: #D97757; }
+  .bt-c:hover::after, .bt-c.is-hover::after { opacity: 1; animation: shimmer 1.4s ease-in-out infinite; }
+  @keyframes shimmer { from { left: -60%; } to { left: 130%; } }
+  .bt-c:active, .bt-c.is-active { background: #1F1E1D; }
+  .bt-c:disabled { background: #262624; cursor: progress; border-color: #3A3836; }
+  .bt-c:disabled::after { opacity: 0; animation: none; }
+  .bt-c:focus-visible, .bt-c.is-focus { outline: 3px solid #D97757; outline-offset: 2px; }
+
+  /* ============ D: ミニマル・エディトリアル ============ */
+  .bt-d { display: flex; align-items: center; justify-content: center; padding: 9px 16px 8px; color: #3D3929;
+    background: transparent; border: none; border-bottom: 2px solid #C6613F; border-radius: 2px;
+    cursor: pointer; font-weight: 600; font-size: 14px; letter-spacing: .08em;
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", Georgia, serif;
+    transition: background .2s, border-color .2s; }
+  .bt-d .sp { width: 12px; height: 12px; margin-right: 10px; color: #C6613F; }
+  .bt-d:hover, .bt-d.is-hover { background: #EFE9DA; border-bottom-color: #8F3F20; }
+  .bt-d:active, .bt-d.is-active { background: #E6DFCB; }
+  .bt-d:disabled { background: transparent; cursor: progress; border-bottom-style: dotted; }
+  .bt-d:focus-visible, .bt-d.is-focus { outline: 2px solid #3D3929; outline-offset: 3px; }
+
+  /* 動きの抑制（各案共通） */
+  @media (prefers-reduced-motion: reduce) {
+    .bt, .bt *, .bt::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>生成ボタン Claude風 モックアップ（ai-writing-assistant-plugin）</h1>
+  <button class="tg on" id="tgPc" type="button">PC幅（内容幅）</button>
+  <button class="tg" id="tgSp" type="button">モバイル（幅100% / 390px）</button>
+</header>
+<main id="root"></main>
+<script>
+(function () {
+  // 12本の放射状スパーク（Claude風）。色は currentColor。
+  var SPARK = '<svg class="sp" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    + '<g stroke="currentColor" stroke-width="2.4" stroke-linecap="round">'
+    + [0,30,60,90,120,150].map(function (a, i) {
+        var l = i % 2 ? 7 : 10;
+        return '<line x1="12" y1="' + (12 - l) + '" x2="12" y2="' + (12 + l) + '" transform="rotate(' + a + ' 12 12)"/>';
+      }).join('')
+    + '</g></svg>';
+  // D用: 小さな4点星
+  var STAR = '<svg class="sp" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="currentColor"/></svg>';
+  var GEM = '<svg class="sp" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="#fff"/></svg>';
+
+  var variants = [
+    { cls: 'bt-cur', name: '現行（Gemini・青グラデ）', desc: '比較用。', icon: GEM, label: 'Geminiでお知らせを作成' },
+    { cls: 'bt-a', name: 'A: テラコッタ塗り', desc: 'ブランド色を面で見せる。白文字のコントラスト確保のため #BA5532→#A64A2A に調整。', icon: SPARK, label: 'Claudeでお知らせを作成' },
+    { cls: 'bt-b', name: 'B: クリーム地 + テラコッタ枠線', desc: 'アウトライン。控えめで既存画面になじむ。ホバーでスパークが回る。', icon: SPARK, label: 'Claudeでお知らせを作成' },
+    { cls: 'bt-c', name: 'C: ダーク', desc: '#262624 地にクリーム文字、スパークはテラコッタ。ホバーでシマー。', icon: SPARK, label: 'Claudeでお知らせを作成' },
+    { cls: 'bt-d', name: 'D: ミニマル・エディトリアル', desc: '明朝系・角丸小・下線風。小さな星。', icon: STAR, label: 'Claudeでお知らせを作成' }
+  ];
+  var states = [
+    { t: '通常', c: '' },
+    { t: 'ホバー', c: ' is-hover' },
+    { t: '押下', c: ' is-active' },
+    { t: '無効（生成中）', c: '', dis: true },
+    { t: 'フォーカス', c: ' is-focus' }
+  ];
+  var html = variants.map(function (v) {
+    var cells = states.map(function (s) {
+      var label = s.dis ? '生成中…' : v.label;
+      return '<div class="cell"><small>' + s.t + '</small><div class="frame"><button type="button" class="bt ' + v.cls + s.c + '"'
+        + (s.dis ? ' disabled' : '') + '>' + v.icon + label + '</button></div></div>';
+    }).join('');
+    return '<section><h2>' + v.name + '</h2><p>' + v.desc + '</p><div class="row">' + cells + '</div></section>';
+  }).join('');
+  document.getElementById('root').innerHTML = html;
+
+  var pc = document.getElementById('tgPc'), sp = document.getElementById('tgSp');
+  function set(m) { document.body.classList.toggle('mobile', m); sp.classList.toggle('on', m); pc.classList.toggle('on', !m); }
+  pc.onclick = function () { set(false); };
+  sp.onclick = function () { set(true); };
+})();
+</script>
+</body>
+</html>
