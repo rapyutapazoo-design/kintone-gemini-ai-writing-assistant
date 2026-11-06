@@ -1,0 +1,342 @@
+/* 生成ボタンのデザイン（Claude風 / Gemini風）。js/button-designs.js と対で使う。 */
+
+/* 土台 */
+.obp-bd {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+}
+
+.obp-bd .obp-bd-sp {
+  flex: none;
+}
+
+@keyframes obp-bd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes obp-bd-gem-pulse {
+  0% {
+    transform: rotate(0) scale(0.88);
+  }
+
+  50% {
+    transform: rotate(45deg) scale(1.08);
+  }
+
+  100% {
+    transform: rotate(90deg) scale(0.88);
+  }
+}
+
+/* ============ Claude B: 白地 + 黒セリフ + テラコッタのスパーク ============ */
+.obp-bd.obp-bd--claude-b {
+  padding: 8px 22px 8px 14px;
+  color: #141413;
+  background: #fff;
+  border: 1.5px solid #141413;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  font-family:
+    'Tiempos Headline', 'Tiempos Text', Georgia, 'Hiragino Mincho ProN',
+    'Yu Mincho', serif;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+.obp-bd--claude-b .obp-bd-sp {
+  width: 26px;
+  height: 26px;
+  margin: -2px 6px -2px -4px;
+  color: #d97757;
+  transition: transform 0.6s;
+}
+
+.obp-bd.obp-bd--claude-b:hover:not(:disabled) {
+  background: #fbefe9;
+  box-shadow: 0 2px 6px rgba(217, 119, 87, 0.35);
+}
+
+.obp-bd--claude-b:hover:not(:disabled) .obp-bd-sp {
+  transform: rotate(60deg);
+}
+
+.obp-bd.obp-bd--claude-b:active:not(:disabled) {
+  background: #f5dcd0;
+  box-shadow: none;
+}
+
+.obp-bd.obp-bd--claude-b:disabled {
+  background: #fff;
+  cursor: progress;
+  box-shadow: none;
+  border-style: dashed;
+}
+
+.obp-bd--claude-b:disabled .obp-bd-sp {
+  animation: obp-bd-spin 6s linear infinite;
+}
+
+.obp-bd.obp-bd--claude-b:focus-visible {
+  outline: 3px solid #d97757;
+  outline-offset: 2px;
+}
+
+/* ============ Claude C: 黒地 + 白セリフ + テラコッタのスパーク ============ */
+.obp-bd.obp-bd--claude-c {
+  padding: 8px 22px 8px 14px;
+  color: #fff;
+  background: #141413;
+  border: 1px solid #141413;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 15px;
+  font-family:
+    'Tiempos Headline', 'Tiempos Text', Georgia, 'Hiragino Mincho ProN',
+    'Yu Mincho', serif;
+  box-shadow: 0 2px 6px rgba(20, 20, 19, 0.3);
+  transition: background 0.15s;
+}
+
+.obp-bd--claude-c .obp-bd-sp {
+  width: 26px;
+  height: 26px;
+  margin: -2px 6px -2px -4px;
+  color: #d97757;
+}
+
+.obp-bd.obp-bd--claude-c:hover:not(:disabled) {
+  background: #2b2a28;
+}
+
+.obp-bd--claude-c:hover:not(:disabled) .obp-bd-sp {
+  animation: obp-bd-spin 2.4s linear infinite;
+}
+
+.obp-bd.obp-bd--claude-c:active:not(:disabled) {
+  background: #000;
+}
+
+.obp-bd.obp-bd--claude-c:disabled {
+  background: #141413;
+  cursor: progress;
+  border-color: #4a4946;
+}
+
+.obp-bd--claude-c:disabled .obp-bd-sp {
+  animation: obp-bd-spin 6s linear infinite;
+}
+
+.obp-bd.obp-bd--claude-c:focus-visible {
+  outline: 3px solid #d97757;
+  outline-offset: 2px;
+}
+
+/* ============ Gemini A: 白地ライト ============ */
+.obp-bd.obp-bd--gemini-a {
+  padding: 8px 22px 8px 14px;
+  color: #1a66dc;
+  background: #fff;
+  border: 1.5px solid #dadce0;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  font-family:
+    'Google Sans', 'Product Sans', system-ui, 'Hiragino Sans', sans-serif;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+
+.obp-bd--gemini-a .obp-bd-tx {
+  background: linear-gradient(90deg, #1558d6 0%, #1a66dc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.obp-bd.obp-bd--gemini-a:hover:not(:disabled) {
+  background: #f1f6fe;
+  border-color: #aecbfa;
+  box-shadow: 0 1px 4px rgba(66, 133, 244, 0.35);
+}
+
+.obp-bd.obp-bd--gemini-a:active:not(:disabled) {
+  background: #e8f0fe;
+  border-color: #8ab4f8;
+  box-shadow: none;
+}
+
+.obp-bd.obp-bd--gemini-a:disabled {
+  background: #fff;
+  border-color: #dadce0;
+  border-style: dashed;
+  cursor: progress;
+  box-shadow: none;
+}
+
+.obp-bd.obp-bd--gemini-a:focus-visible {
+  outline: 3px solid #1a66dc;
+  outline-offset: 2px;
+}
+
+/* ============ Gemini B: ダーク ============ */
+.obp-bd.obp-bd--gemini-b {
+  padding: 8px 22px 8px 14px;
+  color: #a98ef2;
+  background: #131314;
+  border: 1.5px solid #3c4043;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  font-family:
+    'Google Sans', 'Product Sans', system-ui, 'Hiragino Sans', sans-serif;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.obp-bd--gemini-b .obp-bd-tx {
+  background: linear-gradient(90deg, #4f95ff 0%, #a98ef2 55%, #f0627a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.obp-bd.obp-bd--gemini-b:hover:not(:disabled) {
+  background: #1e1f20;
+  border-color: #a98ef2;
+}
+
+.obp-bd.obp-bd--gemini-b:active:not(:disabled) {
+  background: #000;
+  border-color: #4f95ff;
+}
+
+.obp-bd.obp-bd--gemini-b:disabled {
+  background: #131314;
+  border-color: #5f6368;
+  border-style: dashed;
+  cursor: progress;
+}
+
+.obp-bd.obp-bd--gemini-b:focus-visible {
+  outline: 3px solid #a98ef2;
+  outline-offset: 2px;
+}
+
+/* ============ Gemini C: ブルー面 + 白チップ ============ */
+.obp-bd.obp-bd--gemini-c {
+  padding: 6px 20px 6px 7px;
+  color: #fff;
+  background: linear-gradient(135deg, #1f6fe5 0%, #1558d6 100%);
+  border: none;
+  border-radius: 14px;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  font-family:
+    'Google Sans', 'Product Sans', system-ui, 'Hiragino Sans', sans-serif;
+  box-shadow: 0 2px 6px rgba(21, 88, 214, 0.35);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+}
+
+.obp-bd .obp-bd-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 10px;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.obp-bd.obp-bd--gemini-a .obp-bd-sp,
+.obp-bd.obp-bd--gemini-b .obp-bd-sp {
+  width: 22px;
+  height: 22px;
+  margin: 0 8px 0 0;
+}
+
+.obp-bd--gemini-c .obp-bd-chip .obp-bd-sp {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.obp-bd.obp-bd--gemini-c:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1967d2 0%, #1250b0 100%);
+  box-shadow: 0 4px 10px rgba(18, 80, 176, 0.45);
+}
+
+.obp-bd.obp-bd--gemini-c:active:not(:disabled) {
+  background: linear-gradient(135deg, #1250b0 0%, #0f4296 100%);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px);
+}
+
+.obp-bd.obp-bd--gemini-c:disabled {
+  background: #2a5db0;
+  box-shadow: none;
+  cursor: progress;
+}
+
+.obp-bd.obp-bd--gemini-c:focus-visible {
+  outline: 3px solid #1558d6;
+  outline-offset: 2px;
+}
+
+.obp-bd--gemini-a:disabled .obp-bd-sp,
+.obp-bd--gemini-b:disabled .obp-bd-sp,
+.obp-bd--gemini-c:disabled .obp-bd-chip .obp-bd-sp {
+  animation: obp-bd-gem-pulse 2.4s ease-in-out infinite;
+}
+
+/* 小さいサイズ（要約ボタン）。各デザインの後ろに置いて padding を上書きする */
+.obp-bd.obp-bd--sm {
+  padding: 8px 16px;
+}
+
+.obp-bd.obp-bd--gemini-c.obp-bd--sm {
+  padding: 6px 16px 6px 7px;
+}
+
+/* 狭い画面で文言がはみ出す場合は折り返す */
+@media (max-width: 480px) {
+  .obp-bd {
+    white-space: normal;
+  }
+}
+
+/* 動きの抑制 */
+@media (prefers-reduced-motion: reduce) {
+  .obp-bd,
+  .obp-bd * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
