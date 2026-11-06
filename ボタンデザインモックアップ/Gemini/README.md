@@ -3,7 +3,7 @@
 `index.html` をブラウザで開くだけで確認できます（ビルド不要・外部通信なし・外部フォント不使用）。先頭に「Gemini 公式ロゴ（参考）」の近似表示、続いて現行の Gemini ボタンと A〜D 案を「通常 / ホバー / 押下 / 無効（生成中） / フォーカス」で並べています。ヘッダーのボタンでモバイル表示（幅100%・390px）に切り替えられます。文言はすべて「Geminiでお知らせを作成」です。Claude 版（`../Claude/`）の構成を踏襲しています。
 
 ## 色の出所
-- Google 標準色 `#EA4335`（赤）`#FBBC04`（黄）`#34A853`（緑）`#4285F4`（青）を、参考画像7（赤=上、黄=左、緑=下、青=右・中央）のおおよその見た目と見比べて採用しました。画像7の実際のスパークルは赤が `#FF4A4A` 付近、青が `#2F86FF` 付近とやや鮮やかですが、標準色の方がブランド色として確実なため標準色を使い、青の下地だけ `#3F86F6` にして画像寄りに調整しています。
+- Google 標準色 `#EA4335`（赤）`#FBBC04`（黄）`#34A853`（緑）`#4285F4`（青）を、参考画像8（赤=上、黄=左、緑=下、青=右・中央）のおおよその見た目と見比べて採用しました。画像8の実際のスパークルは赤が `#FF4A4A` 付近、青が `#2F86FF` 付近とやや鮮やかですが、標準色の方がブランド色として確実なため標準色を使い、青の下地は `#3385FF`、赤・黄・緑のグラデは画像8に合わせて `#F94545` / `#FBBC04`→`#C8D63E` / `#0FB866` 寄りに調整しています。
 - 画像5の文字: 青のグラデーション（左 `#2F72EE` 付近 → 右 `#5AA0F8` 付近）。参考表示ではこれを使用。ボタン A では 4.5:1 を満たすよう `#1558D6` → `#1A66DC` に暗くしています（派生値）。
 - 画像6: スパークルは青（`#4285F4`）〜薄紫（`#C3A7F5`）、文字は青 `#4F95FF` → 紫 `#A98EF2` → ピンク赤 `#F0627A`。目視で読んだ近似値です。
 - 画像7の背景: 淡い水色〜`#2F9BFF` 系の青。C の面色はコントラスト確保のため `#1F6FE5` → `#1558D6` に暗くした派生値。
@@ -28,18 +28,18 @@
 **A（白地ライト）**。kintone の白〜薄グレー画面になじみ、Gemini 公式ロゴ（画像5）の雰囲気をそのまま使え、全状態でコントラストも確保できます。無効は破線枠 + スパークル回転（opacity 不使用）で区別されます。主役ボタンとして目立たせたい場合は C、現行からの差し替えを最小にしたい場合は D が候補です。B はダークテーマ運用向けです。
 
 ## スパークルSVGの出所
-画像7の形（上下左右の4先端が丸く、辺が中心へ向かって凹む星）を目で読み取り、100x100 座標の三次ベジェ + 先端の二次ベジェで手描きした**近似**です。`index.html` では `<path id="gem-shape">` を共通化し、`<symbol id="gem">`（フルカラー: 青の下地に緑・黄・赤の放射グラデを重ねる）、`gem-dark`（青〜薄紫の線形グラデ）、`gem-mono`（`currentColor`）を定義して `<use>` で使っています。生成中（無効）はゆっくり回転・脈動し、`prefers-reduced-motion: reduce` で停止します。
+画像8の形（上下左右の4先端が丸く、辺が中心へ向かって凹む星）を目で読み取り、100x100 座標の三次ベジェ + 先端の二次ベジェで手描きした**近似**です。`index.html` では `<path id="gem-shape">` を共通化し、`<symbol id="gem">`（フルカラー: 青の下地に緑・黄・赤の放射グラデを重ねる）、`gem-dark`（青〜薄紫の線形グラデ）、`gem-mono`（`currentColor`）を定義して `<use>` で使っています。生成中（無効）はゆっくり回転・脈動し、`prefers-reduced-motion: reduce` で停止します。
 
 フルカラー版のスタンドアロン SVG（そのまま貼り付け可能）:
 
 ```html
-<svg viewBox="0 0 100 100" width="22" height="22" aria-hidden="true"><defs><radialGradient id="gr-red" gradientUnits="userSpaceOnUse" cx="50" cy="6" r="40"><stop offset="0" stop-color="#EA4335"/><stop offset=".45" stop-color="#EA4335" stop-opacity=".85"/><stop offset="1" stop-color="#EA4335" stop-opacity="0"/></radialGradient><radialGradient id="gr-yellow" gradientUnits="userSpaceOnUse" cx="4" cy="50" r="38"><stop offset="0" stop-color="#FBBC04"/><stop offset=".45" stop-color="#FBBC04" stop-opacity=".85"/><stop offset="1" stop-color="#FBBC04" stop-opacity="0"/></radialGradient><radialGradient id="gr-green" gradientUnits="userSpaceOnUse" cx="44" cy="96" r="42"><stop offset="0" stop-color="#34A853"/><stop offset=".5" stop-color="#34A853" stop-opacity=".85"/><stop offset="1" stop-color="#34A853" stop-opacity="0"/></radialGradient><path id="gem-shape" d="M47 9 Q50 1 53 9 C54.5 36 63 46 91 47 Q99 50 91 53 C63 54 54.5 64 53 91 Q50 99 47 91 C45.5 64 37 54 9 53 Q1 50 9 47 C37 46 45.5 36 47 9 Z"/></defs><use href="#gem-shape" fill="#3F86F6"/><use href="#gem-shape" fill="url(#gr-green)"/><use href="#gem-shape" fill="url(#gr-yellow)"/><use href="#gem-shape" fill="url(#gr-red)"/></svg>
+<svg viewBox="0 0 100 100" width="22" height="22" aria-hidden="true"><defs><radialGradient id="gr-red" gradientUnits="userSpaceOnUse" cx="46" cy="4" r="44"><stop offset="0" stop-color="#F94545"/><stop offset=".4" stop-color="#F94545" stop-opacity=".9"/><stop offset=".75" stop-color="#F94545" stop-opacity=".25"/><stop offset="1" stop-color="#F94545" stop-opacity="0"/></radialGradient><radialGradient id="gr-yellow" gradientUnits="userSpaceOnUse" cx="3" cy="52" r="56"><stop offset="0" stop-color="#FBBC04"/><stop offset=".4" stop-color="#F2C21A" stop-opacity=".95"/><stop offset=".75" stop-color="#C8D63E" stop-opacity=".35"/><stop offset="1" stop-color="#C8D63E" stop-opacity="0"/></radialGradient><radialGradient id="gr-green" gradientUnits="userSpaceOnUse" cx="44" cy="97" r="50"><stop offset="0" stop-color="#0FB866"/><stop offset=".45" stop-color="#2DB86A" stop-opacity=".9"/><stop offset=".8" stop-color="#2DB86A" stop-opacity=".25"/><stop offset="1" stop-color="#2DB86A" stop-opacity="0"/></radialGradient><path id="gem-shape" d="M47.6 8 C48.5 3.5 51.5 3.5 52.4 8 C54 27 72 46 92 47.6 C96.5 48.5 96.5 51.5 92 52.4 C72 54 54 73 52.4 92 C51.5 96.5 48.5 96.5 47.6 92 C46 73 28 54 8 52.4 C3.5 51.5 3.5 48.5 8 47.6 C28 46 46 27 47.6 8 Z"/></defs><use href="#gem-shape" fill="#3385FF"/><use href="#gem-shape" fill="url(#gr-green)"/><use href="#gem-shape" fill="url(#gr-yellow)"/><use href="#gem-shape" fill="url(#gr-red)"/></svg>
 ```
 
 単色版（`color` で色が決まる。青面の白ボタン用）:
 
 ```html
-<svg viewBox="0 0 100 100" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M47 9 Q50 1 53 9 C54.5 36 63 46 91 47 Q99 50 91 53 C63 54 54.5 64 53 91 Q50 99 47 91 C45.5 64 37 54 9 53 Q1 50 9 47 C37 46 45.5 36 47 9 Z"/></svg>
+<svg viewBox="0 0 100 100" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M47.6 8 C48.5 3.5 51.5 3.5 52.4 8 C54 27 72 46 92 47.6 C96.5 48.5 96.5 51.5 92 52.4 C72 54 54 73 52.4 92 C51.5 96.5 48.5 96.5 47.6 92 C46 73 28 54 8 52.4 C3.5 51.5 3.5 48.5 8 47.6 C28 46 46 27 47.6 8 Z"/></svg>
 ```
 
 ## 本番へ反映する手順

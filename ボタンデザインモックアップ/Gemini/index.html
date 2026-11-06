@@ -107,16 +107,16 @@
 </style>
 </head>
 <body>
-<!-- スパークル共通定義（画像7の形を目で読み取った近似。4点・凹んだ三次ベジェ・先端は丸い） -->
+<!-- スパークル共通定義（画像8の形を目で読み取った近似。4点・凹んだ三次ベジェ・先端は丸い） -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
-    <path id="gem-shape" d="M47 9 Q50 1 53 9 C54.5 36 63 46 91 47 Q99 50 91 53 C63 54 54.5 64 53 91 Q50 99 47 91 C45.5 64 37 54 9 53 Q1 50 9 47 C37 46 45.5 36 47 9 Z"/>
-    <radialGradient id="gr-red" gradientUnits="userSpaceOnUse" cx="50" cy="6" r="40"><stop offset="0" stop-color="#EA4335"/><stop offset=".45" stop-color="#EA4335" stop-opacity=".85"/><stop offset="1" stop-color="#EA4335" stop-opacity="0"/></radialGradient>
-    <radialGradient id="gr-yellow" gradientUnits="userSpaceOnUse" cx="4" cy="50" r="38"><stop offset="0" stop-color="#FBBC04"/><stop offset=".45" stop-color="#FBBC04" stop-opacity=".85"/><stop offset="1" stop-color="#FBBC04" stop-opacity="0"/></radialGradient>
-    <radialGradient id="gr-green" gradientUnits="userSpaceOnUse" cx="44" cy="96" r="42"><stop offset="0" stop-color="#34A853"/><stop offset=".5" stop-color="#34A853" stop-opacity=".85"/><stop offset="1" stop-color="#34A853" stop-opacity="0"/></radialGradient>
+    <path id="gem-shape" d="M47.6 8 C48.5 3.5 51.5 3.5 52.4 8 C54 27 72 46 92 47.6 C96.5 48.5 96.5 51.5 92 52.4 C72 54 54 73 52.4 92 C51.5 96.5 48.5 96.5 47.6 92 C46 73 28 54 8 52.4 C3.5 51.5 3.5 48.5 8 47.6 C28 46 46 27 47.6 8 Z"/>
+    <radialGradient id="gr-red" gradientUnits="userSpaceOnUse" cx="46" cy="4" r="44"><stop offset="0" stop-color="#F94545"/><stop offset=".4" stop-color="#F94545" stop-opacity=".9"/><stop offset=".75" stop-color="#F94545" stop-opacity=".25"/><stop offset="1" stop-color="#F94545" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gr-yellow" gradientUnits="userSpaceOnUse" cx="3" cy="52" r="56"><stop offset="0" stop-color="#FBBC04"/><stop offset=".4" stop-color="#F2C21A" stop-opacity=".95"/><stop offset=".75" stop-color="#C8D63E" stop-opacity=".35"/><stop offset="1" stop-color="#C8D63E" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gr-green" gradientUnits="userSpaceOnUse" cx="44" cy="97" r="50"><stop offset="0" stop-color="#0FB866"/><stop offset=".45" stop-color="#2DB86A" stop-opacity=".9"/><stop offset=".8" stop-color="#2DB86A" stop-opacity=".25"/><stop offset="1" stop-color="#2DB86A" stop-opacity="0"/></radialGradient>
     <linearGradient id="gr-dark" gradientUnits="userSpaceOnUse" x1="4" y1="70" x2="96" y2="30"><stop offset="0" stop-color="#4285F4"/><stop offset=".45" stop-color="#5B98FF"/><stop offset="1" stop-color="#C3A7F5"/></linearGradient>
     <symbol id="gem" viewBox="0 0 100 100">
-      <use href="#gem-shape" fill="#3F86F6"/>
+      <use href="#gem-shape" fill="#3385FF"/>
       <use href="#gem-shape" fill="url(#gr-green)"/>
       <use href="#gem-shape" fill="url(#gr-yellow)"/>
       <use href="#gem-shape" fill="url(#gr-red)"/>
