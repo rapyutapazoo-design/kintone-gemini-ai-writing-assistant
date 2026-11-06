@@ -637,15 +637,25 @@
   function startStream(st, conf) {
     const target = st.overlay.querySelector('.obp-ld-stream-text');
     if (!target) return;
-    let sNo = 0;
+    const list = conf.sentences;
+    // 文章はランダムに選ぶ（2文以上あるときは直前と同じ文を続けて出さない）
+    function pickSentence(prev) {
+      if (list.length < 2) return 0;
+      let n;
+      do {
+        n = Math.floor(Math.random() * list.length);
+      } while (n === prev);
+      return n;
+    }
+    let sNo = pickSentence(-1);
     let cNo = 0;
     st.streamInterval = setInterval(function () {
-      const full = conf.sentences[sNo];
+      const full = list[sNo];
       cNo++;
       target.textContent = full.slice(0, cNo);
       if (cNo >= full.length + conf.tail) {
         cNo = 0;
-        sNo = (sNo + 1) % conf.sentences.length;
+        sNo = pickSentence(sNo);
       }
     }, 45);
   }
