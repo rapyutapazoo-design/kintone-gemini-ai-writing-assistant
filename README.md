@@ -76,7 +76,7 @@ npm ci
 ```bash
 npm run build
 ```
-ビルドが成功すると、`ai-writing-assistant-plugin/dist/` ディレクトリ内に `plugin.zip` が生成されます（現在のプラグインバージョンは 16 です）。ワンステップで行う場合は次のとおりです。
+ビルドが成功すると、`ai-writing-assistant-plugin/dist/` ディレクトリ内に `plugin.zip` が生成されます（現在のプラグインバージョンは 18 です）。ワンステップで行う場合は次のとおりです。
 
 ```bash
 cd ai-writing-assistant-plugin && npm ci && npm run build
@@ -173,7 +173,7 @@ AI連携プラグインは ai-writing-assistant-plugin に一本化していま�
 ## 🚀 Kintone環境への導入手順
 
 1. **プラグインのインストール**
-   * 「🛠️ 開発・ビルド環境のセットアップ」の手順で `ai-writing-assistant-plugin/dist/plugin.zip`（バージョン16）を作成します。
+   * 「🛠️ 開発・ビルド環境のセットアップ」の手順で `ai-writing-assistant-plugin/dist/plugin.zip`（バージョン18）を作成します。
    * Kintoneの「kintoneシステム管理 > プラグイン」画面を開きます。
    * 「読み込む」ボタンから、ビルド済みの `dist/plugin.zip` をアップロードします。
    * すでに同じプラグインを読み込み済みの場合は、**同じ `private.ppk` で再ビルドした** `plugin.zip` を上書きで読み込むと更新されます（鍵が違うと別プラグイン扱いになり、既存アプリには適用されません）。

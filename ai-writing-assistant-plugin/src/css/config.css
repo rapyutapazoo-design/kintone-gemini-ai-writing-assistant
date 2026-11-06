@@ -293,6 +293,12 @@
 }
 
 /* ボタンのデザイン選択（ボタン自体の見た目は button-designs.css） */
+.obp-btn-design-hint {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 #obp-btn-design-list .obp-bd-group {
   margin: 12px 0 4px;
   font-weight: bold;
