@@ -6,6 +6,7 @@
   const genOpts = window.GeminiGenerationOptions;
   const presets = window.GeminiPromptPresets;
   const loading = window.AIWritingLoading;
+  const btnDesign = window.AIWritingButtonDesign;
 
   const OPINION_PRESET = presets.getPreset('opinion');
   const DEFAULT_FORMAT_INSTRUCTION = genOpts.getFormatInstructionById(
@@ -50,6 +51,7 @@
     backup_max_chars: '100000',
     space_restore: '',
     btn_label_restore: 'プロンプトを復元',
+    button_design: '',
   };
 
   const STRUCTURE_PRESET_COMMON = {
@@ -1485,6 +1487,7 @@
       ),
       backup_max_chars: backupMaxCharsFinal,
       btn_label_restore: document.getElementById('obp-btn-label-restore').value,
+      button_design: btnDesign.normalize(getSelectedButtonDesign()),
     };
 
     if (!settingsStillMatch(order, snapshot)) {
@@ -1750,6 +1753,151 @@
       .getElementById('obp-loading-mode-group')
       .addEventListener('change', updateLoadingVisibility);
     updateLoadingVisibility();
+  }
+
+  // ---- ボタンのデザインの設定 ----
+  function getSelectedButtonDesign() {
+    const el = document.querySelector('input[name="obp-btn-design"]:checked');
+    return el ? el.value : '';
+  }
+
+  function brandName(provider) {
+    return provider === 'anthropic' ? 'Claude' : 'Gemini';
+  }
+
+  function updateButtonDesignHint() {
+    const hint = document.getElementById('obp-btn-design-hint');
+    if (!hint) return;
+    const selected = btnDesign.DESIGNS.find(
+      (d) => d.id === getSelectedButtonDesign(),
+    );
+    const first = getSelectedProviderOrder().split(',')[0];
+    if (selected && selected.provider !== first) {
+      hint.textContent =
+        '選択中のデザインは' +
+        brandName(selected.provider) +
+        '風ですが先頭のAIは' +
+        brandName(first) +
+        'です。見た目は設定値どおりに固定されます。';
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  function refreshButtonDesignPreviewLabels() {
+    const draft = document.getElementById('obp-btn-label-draft').value;
+    const summary = document.getElementById('obp-btn-label-summary').value;
+    document
+      .querySelectorAll('#obp-btn-design-list [data-obp-bd-kind]')
+      .forEach((btn) => {
+        const isDraft = btn.getAttribute('data-obp-bd-kind') === 'draft';
+        btnDesign.apply(
+          btn,
+          btn.getAttribute('data-obp-bd-id'),
+          isDraft
+            ? draft || DEFAULTS.btn_label_draft
+            : summary || DEFAULTS.btn_label_summary,
+          { icon: true, size: isDraft ? 'md' : 'sm' },
+        );
+      });
+  }
+
+  function updateButtonDesignSelection() {
+    document
+      .querySelectorAll('#obp-btn-design-list .obp-bd-option')
+      .forEach((label) => {
+        const input = label.querySelector('input[type="radio"]');
+        label.classList.toggle('is-selected', !!(input && input.checked));
+      });
+  }
+
+  function buildButtonDesignSettings() {
+    const list = document.getElementById('obp-btn-design-list');
+    if (!list) return;
+    const saved = btnDesign.normalize(config.button_design);
+
+    function addOption(value, title, description, withPreview) {
+      const label = document.createElement('label');
+      label.className = 'obp-bd-option';
+      const head = document.createElement('span');
+      head.className = 'obp-bd-option-head';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'obp-btn-design';
+      radio.value = value;
+      radio.checked = value === saved;
+      head.appendChild(radio);
+      head.appendChild(document.createTextNode(' ' + title));
+      const desc = document.createElement('span');
+      desc.className = 'obp-bd-option-desc';
+      desc.textContent = description;
+      head.appendChild(desc);
+      label.appendChild(head);
+
+      if (withPreview) {
+        const preview = document.createElement('span');
+        preview.className = 'obp-bd-preview';
+        ['draft', 'summary'].forEach((kind) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.setAttribute('data-obp-bd-kind', kind);
+          b.setAttribute('data-obp-bd-id', value);
+          b.addEventListener('click', () => {
+            if (radio.checked) return;
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          preview.appendChild(b);
+        });
+        label.appendChild(preview);
+      } else {
+        const none = document.createElement('span');
+        none.className = 'obp-bd-option-desc';
+        none.textContent = '従来の青いボタンです（プレビューなし）。';
+        label.appendChild(none);
+      }
+      list.appendChild(label);
+    }
+
+    function addGroup(text) {
+      const h = document.createElement('div');
+      h.className = 'obp-bd-group';
+      h.textContent = text;
+      list.appendChild(h);
+    }
+
+    addOption(
+      '',
+      '従来',
+      'これまでと同じ青いグラデーションのボタン（既定）。',
+      false,
+    );
+    [
+      ['anthropic', 'Claude風'],
+      ['gemini', 'Gemini風'],
+    ].forEach((g) => {
+      addGroup(g[1]);
+      btnDesign.DESIGNS.filter((d) => d.provider === g[0]).forEach((d) =>
+        addOption(d.id, d.label, d.description, true),
+      );
+    });
+
+    refreshButtonDesignPreviewLabels();
+    updateButtonDesignSelection();
+    updateButtonDesignHint();
+
+    list.addEventListener('change', () => {
+      updateButtonDesignSelection();
+      updateButtonDesignHint();
+    });
+    ['obp-btn-label-draft', 'obp-btn-label-summary'].forEach((id) => {
+      document
+        .getElementById(id)
+        .addEventListener('input', refreshButtonDesignPreviewLabels);
+    });
+    document
+      .querySelectorAll('input[name="obp-provider-order"]')
+      .forEach((el) => el.addEventListener('change', updateButtonDesignHint));
   }
 
   function bindAnthropicEvents() {
@@ -2065,6 +2213,12 @@
     } catch (e) {
       // ローディング設定の初期化失敗で、設定画面全体を止めない
       console.error('ローディング設定の初期化に失敗しました', e);
+    }
+    try {
+      buildButtonDesignSettings();
+    } catch (e) {
+      // ボタンデザイン設定の初期化失敗で、設定画面全体を止めない
+      console.error('ボタンデザイン設定の初期化に失敗しました', e);
     }
     bindEvents();
     loadFields();

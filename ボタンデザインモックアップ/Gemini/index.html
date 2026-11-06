@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生成ボタン Gemini風 モックアップ（公式ロゴ寄せ）</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; color: #333; background: linear-gradient(#fff 0, #f2f2f2 100%) fixed; }
+  header { padding: 18px 24px; border-bottom: 1px solid #e3e3e3; background: #fff; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0 16px 0 0; }
+  .tg { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tg.on { background: #333; color: #fff; border-color: #333; }
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  section { background: #fff; border: 1px solid #e3e3e3; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  section h2 { font-size: 15px; margin: 0 0 4px; }
+  section p { font-size: 12.5px; color: #666; margin: 0 0 14px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+  .bt { white-space: nowrap; }
+  .cell { min-width: 0; }
+  .cell small { display: block; font-size: 11px; color: #777; margin-bottom: 6px; }
+  .cell .frame { padding: 14px; background: linear-gradient(#fff, #f5f5f5); border: 1px dashed #ddd; border-radius: 6px; }
+  body.mobile .row { grid-template-columns: 1fr; max-width: 390px; }
+  body.mobile .bt { width: 100%; }
+  @media (max-width: 900px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* 公式ロゴ（参考）: 画像の複製ではなく、スパークルSVG + サンセリフ文字による近似 */
+  .logo-pair { display: flex; flex-wrap: wrap; gap: 16px; }
+  .logo-ref { display: flex; align-items: center; gap: 12px; padding: 24px 28px; background: #fff; border: 1px dashed #ddd; border-radius: 6px; width: fit-content; max-width: 100%; }
+  .logo-ref svg { width: 52px; height: 52px; flex: none; }
+  .logo-ref span { font-family: "Google Sans","Product Sans",system-ui,"Hiragino Sans",sans-serif; font-weight: 500; font-size: 56px; line-height: 1.1; letter-spacing: -.02em;
+    background: linear-gradient(90deg, #2F72EE 0%, #3F82F2 55%, #5AA0F8 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+  .logo-ref.dark { background: #000; border-color: #000; }
+  .logo-ref.dark span { background-image: linear-gradient(90deg, #4F95FF 0%, #4F95FF 30%, #A98EF2 62%, #F0627A 100%); }
+  .logo-ref.tile { background: linear-gradient(135deg, #BEE6FF 0%, #5BA9FF 55%, #2F9BFF 100%); padding: 22px; }
+  .logo-ref.tile .chip-ref { width: 84px; height: 84px; border-radius: 22px; background: rgba(255,255,255,.92); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(20,80,160,.25); }
+  .logo-ref.tile svg { width: 48px; height: 48px; }
+
+  /* スパークル共通 */
+  .sp { flex: none; width: 22px; height: 22px; margin: 0 8px 0 0; }
+  @keyframes gem-pulse { 0% { transform: rotate(0) scale(.88); } 50% { transform: rotate(45deg) scale(1.08); } 100% { transform: rotate(90deg) scale(.88); } }
+  .bt:disabled .sp { animation: gem-pulse 2.4s ease-in-out infinite; }
+  .bt:disabled .chip .sp { animation: gem-pulse 2.4s ease-in-out infinite; }
+
+  /* ============ 現行（比較用。青グラデ + 白4点星） ============ */
+  .bt-cur { display: flex; align-items: center; justify-content: center; padding: 10px 20px; color: #fff;
+    background: linear-gradient(135deg, #4285F4 0%, #2962FF 100%); border: none; border-radius: 20px;
+    cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-family: inherit; }
+  .bt-cur:disabled { opacity: .6; cursor: progress; }
+  .bt-cur:focus-visible, .bt-cur.is-focus { outline: 2px solid #2962FF; outline-offset: 2px; }
+  .bt-cur:hover:not(:disabled), .bt-cur.is-hover { filter: brightness(1.08); }
+  .bt-cur .sp { width: 20px; height: 20px; }
+
+  /* ============ A: 白地ライト（画像5の踏襲） ============ */
+  .bt-a { display: flex; align-items: center; justify-content: center; padding: 8px 22px 8px 14px; color: #1A66DC;
+    background: #fff; border: 1.5px solid #DADCE0; border-radius: 999px;
+    cursor: pointer; font-weight: 500; font-size: 15px; letter-spacing: .01em;
+    font-family: "Google Sans","Product Sans",system-ui,"Hiragino Sans",sans-serif;
+    transition: background .15s, box-shadow .15s, border-color .15s; }
+  .bt-a .tx { background: linear-gradient(90deg, #1558D6 0%, #1A66DC 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+  .bt-a:hover:not(:disabled), .bt-a.is-hover { background: #F1F6FE; border-color: #AECBFA; box-shadow: 0 1px 4px rgba(66,133,244,.35); }
+  .bt-a:active:not(:disabled), .bt-a.is-active { background: #E8F0FE; border-color: #8AB4F8; box-shadow: none; }
+  .bt-a:disabled { background: #fff; border-color: #DADCE0; border-style: dashed; cursor: progress; box-shadow: none; }
+  .bt-a:focus-visible, .bt-a.is-focus { outline: 3px solid #1A66DC; outline-offset: 2px; }
+
+  /* ============ B: ダーク（画像6の踏襲） ============ */
+  .bt-b { display: flex; align-items: center; justify-content: center; padding: 8px 22px 8px 14px; color: #A98EF2;
+    background: #131314; border: 1.5px solid #3C4043; border-radius: 999px;
+    cursor: pointer; font-weight: 500; font-size: 15px; letter-spacing: .01em;
+    font-family: "Google Sans","Product Sans",system-ui,"Hiragino Sans",sans-serif;
+    transition: background .15s, border-color .15s; }
+  .bt-b .tx { background: linear-gradient(90deg, #4F95FF 0%, #A98EF2 55%, #F0627A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+  .bt-b:hover:not(:disabled), .bt-b.is-hover { background: #1E1F20; border-color: #A98EF2; }
+  .bt-b:active:not(:disabled), .bt-b.is-active { background: #000; border-color: #4F95FF; }
+  .bt-b:disabled { background: #131314; border-color: #5F6368; border-style: dashed; cursor: progress; }
+  .bt-b:focus-visible, .bt-b.is-focus { outline: 3px solid #A98EF2; outline-offset: 2px; }
+
+  /* ============ C: ブルー面 + 白チップ（画像7の踏襲） ============ */
+  .bt-c { display: flex; align-items: center; justify-content: center; padding: 6px 20px 6px 7px; color: #fff;
+    background: linear-gradient(135deg, #1F6FE5 0%, #1558D6 100%); border: none; border-radius: 14px;
+    cursor: pointer; font-weight: 500; font-size: 15px; letter-spacing: .01em;
+    font-family: "Google Sans","Product Sans",system-ui,"Hiragino Sans",sans-serif;
+    box-shadow: 0 2px 6px rgba(21,88,214,.35); transition: background .15s, box-shadow .15s, transform .1s; }
+  .bt-c .chip { flex: none; width: 30px; height: 30px; margin-right: 10px; border-radius: 9px; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(255,255,255,.6); }
+  .bt-c .chip .sp { width: 20px; height: 20px; margin: 0; }
+  .bt-c:hover:not(:disabled), .bt-c.is-hover { background: linear-gradient(135deg, #1967D2 0%, #1250B0 100%); box-shadow: 0 4px 10px rgba(18,80,176,.45); }
+  .bt-c:active:not(:disabled), .bt-c.is-active { background: linear-gradient(135deg, #1250B0 0%, #0F4296 100%); box-shadow: inset 0 2px 4px rgba(0,0,0,.3); transform: translateY(1px); }
+  .bt-c:disabled { background: #2A5DB0; box-shadow: none; cursor: progress; }
+  .bt-c:focus-visible, .bt-c.is-focus { outline: 3px solid #1558D6; outline-offset: 2px; }
+
+  /* ============ D: 現行の改良（青グラデ維持 + 凹み4点スパークル、ミニマル） ============ */
+  .bt-d { display: flex; align-items: center; justify-content: center; padding: 9px 20px 9px 14px; color: #fff;
+    background: linear-gradient(135deg, #2468E8 0%, #1A4FD0 100%); border: none; border-radius: 12px;
+    cursor: pointer; font-weight: 600; font-size: 14px;
+    font-family: "Google Sans","Product Sans",system-ui,"Hiragino Sans",sans-serif;
+    box-shadow: 0 1px 3px rgba(26,79,208,.4); transition: background .15s, box-shadow .15s; }
+  .bt-d .sp { width: 20px; height: 20px; color: #fff; }
+  .bt-d:hover:not(:disabled), .bt-d.is-hover { background: linear-gradient(135deg, #1D5CD8 0%, #1543B8 100%); box-shadow: 0 3px 8px rgba(21,67,184,.45); }
+  .bt-d:active:not(:disabled), .bt-d.is-active { background: linear-gradient(135deg, #1543B8 0%, #103896 100%); box-shadow: inset 0 2px 3px rgba(0,0,0,.3); }
+  .bt-d:disabled { background: #3A5FB5; box-shadow: none; cursor: progress; }
+  .bt-d:focus-visible, .bt-d.is-focus { outline: 2px solid #1A4FD0; outline-offset: 2px; }
+
+  /* 動きの抑制（各案共通） */
+  @media (prefers-reduced-motion: reduce) {
+    .bt, .bt *, .bt::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<!-- スパークル共通定義（画像8の形を目で読み取った近似。4点・凹んだ三次ベジェ・先端は丸い） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <path id="gem-shape" d="M47.6 8 C48.5 3.5 51.5 3.5 52.4 8 C54 27 72 46 92 47.6 C96.5 48.5 96.5 51.5 92 52.4 C72 54 54 73 52.4 92 C51.5 96.5 48.5 96.5 47.6 92 C46 73 28 54 8 52.4 C3.5 51.5 3.5 48.5 8 47.6 C28 46 46 27 47.6 8 Z"/>
+    <radialGradient id="gr-red" gradientUnits="userSpaceOnUse" cx="46" cy="4" r="44"><stop offset="0" stop-color="#F94545"/><stop offset=".4" stop-color="#F94545" stop-opacity=".9"/><stop offset=".75" stop-color="#F94545" stop-opacity=".25"/><stop offset="1" stop-color="#F94545" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gr-yellow" gradientUnits="userSpaceOnUse" cx="3" cy="52" r="56"><stop offset="0" stop-color="#FBBC04"/><stop offset=".4" stop-color="#F2C21A" stop-opacity=".95"/><stop offset=".75" stop-color="#C8D63E" stop-opacity=".35"/><stop offset="1" stop-color="#C8D63E" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gr-green" gradientUnits="userSpaceOnUse" cx="44" cy="97" r="50"><stop offset="0" stop-color="#0FB866"/><stop offset=".45" stop-color="#2DB86A" stop-opacity=".9"/><stop offset=".8" stop-color="#2DB86A" stop-opacity=".25"/><stop offset="1" stop-color="#2DB86A" stop-opacity="0"/></radialGradient>
+    <linearGradient id="gr-dark" gradientUnits="userSpaceOnUse" x1="4" y1="70" x2="96" y2="30"><stop offset="0" stop-color="#4285F4"/><stop offset=".45" stop-color="#5B98FF"/><stop offset="1" stop-color="#C3A7F5"/></linearGradient>
+    <symbol id="gem" viewBox="0 0 100 100">
+      <use href="#gem-shape" fill="#3385FF"/>
+      <use href="#gem-shape" fill="url(#gr-green)"/>
+      <use href="#gem-shape" fill="url(#gr-yellow)"/>
+      <use href="#gem-shape" fill="url(#gr-red)"/>
+    </symbol>
+    <symbol id="gem-dark" viewBox="0 0 100 100"><use href="#gem-shape" fill="url(#gr-dark)"/></symbol>
+    <symbol id="gem-mono" viewBox="0 0 100 100"><use href="#gem-shape" fill="currentColor"/></symbol>
+  </defs>
+</svg>
+<header>
+  <h1>生成ボタン Gemini風 モックアップ（公式ロゴ寄せ / ai-writing-assistant-plugin）</h1>
+  <button class="tg on" id="tgPc" type="button">PC幅（内容幅）</button>
+  <button class="tg" id="tgSp" type="button">モバイル（幅100% / 390px）</button>
+</header>
+<main id="root">
+  <section>
+    <h2>Gemini 公式ロゴ（参考）</h2>
+    <p>画像の複製ではなく、スパークルSVG（手描きの近似）+ サンセリフ体テキストによる近似表示です（外部フォント不使用）。左から 画像5相当（白地）/ 画像6相当（黒地）/ 画像7相当（青背景 + 白角丸スクエア）。</p>
+    <div class="logo-pair">
+      <div class="logo-ref"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#gem"/></svg><span>Gemini</span></div>
+      <div class="logo-ref dark"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#gem-dark"/></svg><span>Gemini</span></div>
+      <div class="logo-ref tile"><div class="chip-ref"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#gem"/></svg></div></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  function sp(id) { return '<svg class="sp" viewBox="0 0 100 100" aria-hidden="true"><use href="#' + id + '"/></svg>'; }
+  var variants = [
+    { cls: 'bt-cur', name: '現行 Gemini ボタン（比較用）', desc: '青グラデ + 白の細い4点星。白文字は最も薄い #4285F4 側で 3.56:1 のため基準未満。無効は opacity .6。', icon: sp('gem-mono'), tx: false },
+    { cls: 'bt-a', name: 'A: 白地ライト（画像5の踏襲）', desc: '白地 + 薄い枠線のピル + フルカラーのスパークル + 青グラデ文字（最も薄い #1A66DC でも白地 5.28:1）。', icon: sp('gem'), tx: true },
+    { cls: 'bt-b', name: 'B: ダーク（画像6の踏襲）', desc: '#131314 地 + 青〜薄紫のスパークル + 青→紫→ピンク赤のグラデ文字。', icon: sp('gem-dark'), tx: true },
+    { cls: 'bt-c', name: 'C: ブルー面 + 白チップ（画像7の背景踏襲）', desc: '青面（#1F6FE5→#1558D6、白文字 4.70:1 以上）の左に白い角丸スクエアのチップ + フルカラーのスパークル。', icon: '<span class="chip">' + sp('gem') + '</span>', tx: false },
+    { cls: 'bt-d', name: 'D: 現行の改良・ミニマル版', desc: '青グラデ（白文字 4.5:1 以上に調整）を保ち、白単色のスパークルを凹み4点星に差し替え。角丸12px・影は控えめ。', icon: sp('gem-mono'), tx: false }
+  ];
+  var states = [
+    { t: '通常', c: '' },
+    { t: 'ホバー', c: ' is-hover' },
+    { t: '押下', c: ' is-active' },
+    { t: '無効（生成中）', c: '', dis: true },
+    { t: 'フォーカス', c: ' is-focus' }
+  ];
+  var LABEL = 'Geminiでお知らせを作成';
+  var html = variants.map(function (v) {
+    var cells = states.map(function (s) {
+      var label = s.dis ? '生成中…' : LABEL;
+      var inner = v.tx ? '<span class="tx">' + label + '</span>' : label;
+      return '<div class="cell"><small>' + s.t + '</small><div class="frame"><button type="button" class="bt ' + v.cls + s.c + '"'
+        + (s.dis ? ' disabled' : '') + '>' + v.icon + inner + '</button></div></div>';
+    }).join('');
+    return '<section><h2>' + v.name + '</h2><p>' + v.desc + '</p><div class="row">' + cells + '</div></section>';
+  }).join('');
+  document.getElementById('root').insertAdjacentHTML('beforeend', html);
+
+  var pc = document.getElementById('tgPc'), spb = document.getElementById('tgSp');
+  function set(m) { document.body.classList.toggle('mobile', m); spb.classList.toggle('on', m); pc.classList.toggle('on', !m); }
+  pc.onclick = function () { set(false); };
+  spb.onclick = function () { set(true); };
+})();
+</script>
+</body>
+</html>

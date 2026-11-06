@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生成ボタン Claude風 モックアップ（公式ロゴ寄せ）</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; color: #333; background: linear-gradient(#fff 0, #f2f2f2 100%) fixed; }
+  header { padding: 18px 24px; border-bottom: 1px solid #e3e3e3; background: #fff; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0 16px 0 0; }
+  .tg { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tg.on { background: #333; color: #fff; border-color: #333; }
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  section { background: #fff; border: 1px solid #e3e3e3; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  section h2 { font-size: 15px; margin: 0 0 4px; }
+  section p { font-size: 12.5px; color: #666; margin: 0 0 14px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+  .bt { white-space: nowrap; }
+  .cell { min-width: 0; }
+  .cell small { display: block; font-size: 11px; color: #777; margin-bottom: 6px; }
+  .cell .frame { padding: 14px; background: linear-gradient(#fff, #f5f5f5); border: 1px dashed #ddd; border-radius: 6px; }
+  body.mobile .row { grid-template-columns: 1fr; max-width: 390px; }
+  body.mobile .bt { width: 100%; }
+  @media (max-width: 900px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* 公式ロゴ（参考）: 画像の複製ではなく、スパークSVG + セリフ体テキストによる近似 */
+  .logo-ref { display: flex; align-items: center; gap: 14px; padding: 24px 28px; background: #fff; border: 1px dashed #ddd; border-radius: 6px; width: fit-content; max-width: 100%; }
+  .logo-ref svg { width: 56px; height: 56px; color: #D97757; flex: none; }
+  .logo-ref span { font-family: "Tiempos Headline","Tiempos Text",Georgia,"Hiragino Mincho ProN","Yu Mincho",serif; font-size: 52px; line-height: 1; color: #141413; letter-spacing: -.01em; }
+  .logo-ref.ground { background: #D97757; }
+  .logo-ref.ground svg { color: #fff; }
+  .logo-pair { display: flex; flex-wrap: wrap; gap: 16px; }
+
+  /* ============ 現行（Gemini・比較用） ============ */
+  .bt-cur { display: flex; align-items: center; justify-content: center; padding: 10px 20px; color: #fff;
+    background: linear-gradient(135deg, #4285F4 0%, #2962FF 100%); border: none; border-radius: 20px;
+    cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-family: inherit; }
+  .bt-cur:disabled { opacity: .6; cursor: progress; }
+  .bt-cur:focus-visible, .bt-cur.is-focus { outline: 2px solid #2962FF; outline-offset: 2px; }
+  .bt-cur:hover:not(:disabled), .bt-cur.is-hover { filter: brightness(1.08); }
+
+  .sp { flex: none; width: 26px; height: 26px; margin: -2px 6px -2px -4px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .bt-a:disabled .sp, .bt-b:disabled .sp, .bt-c:disabled .sp, .bt-d:disabled .sp { animation: spin 6s linear infinite; }
+
+  /* ============ A: テラコッタ地 + 白スパーク（画像4の踏襲） ============ */
+  /* 文字は #141413（白だと #D97757 上で 3.1:1 のため）。スパークは非文字なので白で 3:1 以上 */
+  .bt-a { display: flex; align-items: center; justify-content: center; padding: 10px 22px 10px 16px; color: #141413;
+    background: #D97757; border: none; border-radius: 10px;
+    cursor: pointer; font-weight: 600; font-size: 15px; letter-spacing: .02em;
+    font-family: "Tiempos Headline","Tiempos Text",Georgia,"Hiragino Mincho ProN","Yu Mincho",serif;
+    transition: background .15s, box-shadow .15s, transform .1s; }
+  .bt-a .sp { color: #fff; }
+  .bt-a:hover, .bt-a.is-hover { background: #E38C6F; box-shadow: 0 3px 8px rgba(20,20,19,.25); }
+  .bt-a:active, .bt-a.is-active { background: #C9633F; box-shadow: inset 0 2px 4px rgba(0,0,0,.25); transform: translateY(1px); }
+  .bt-a:disabled { background: #D97757; cursor: progress; box-shadow: none; transform: none; }
+  .bt-a:focus-visible, .bt-a.is-focus { outline: 3px solid #141413; outline-offset: 2px; }
+
+  /* ============ B: 白地 + 黒セリフ + テラコッタのスパーク（画像3の踏襲） ============ */
+  .bt-b { display: flex; align-items: center; justify-content: center; padding: 8px 22px 8px 14px; color: #141413;
+    background: #fff; border: 1.5px solid #141413; border-radius: 999px;
+    cursor: pointer; font-weight: 600; font-size: 15px;
+    font-family: "Tiempos Headline","Tiempos Text",Georgia,"Hiragino Mincho ProN","Yu Mincho",serif;
+    transition: background .15s, box-shadow .15s; }
+  .bt-b .sp { color: #D97757; transition: transform .6s; }
+  .bt-b:hover, .bt-b.is-hover { background: #FBEFE9; box-shadow: 0 2px 6px rgba(217,119,87,.35); }
+  .bt-b:hover:not(:disabled) .sp, .bt-b.is-hover .sp { transform: rotate(60deg); }
+  .bt-b:active, .bt-b.is-active { background: #F5DCD0; box-shadow: none; }
+  .bt-b:disabled { background: #fff; cursor: progress; box-shadow: none; border-style: dashed; }
+  .bt-b:focus-visible, .bt-b.is-focus { outline: 3px solid #D97757; outline-offset: 2px; }
+
+  /* ============ C: 黒（#141413）地 + 白セリフ + テラコッタのスパーク ============ */
+  .bt-c { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 8px 22px 8px 14px; color: #fff;
+    background: #141413; border: 1px solid #141413; border-radius: 12px;
+    cursor: pointer; font-weight: 600; font-size: 15px;
+    font-family: "Tiempos Headline","Tiempos Text",Georgia,"Hiragino Mincho ProN","Yu Mincho",serif;
+    box-shadow: 0 2px 6px rgba(20,20,19,.3); transition: background .15s, border-color .15s; }
+  .bt-c .sp { color: #D97757; }
+  .bt-c::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.14), transparent); transform: skewX(-20deg); opacity: 0; pointer-events: none; }
+  .bt-c:hover, .bt-c.is-hover { background: #2B2A28; border-color: #D97757; }
+  .bt-c:hover::after, .bt-c.is-hover::after { opacity: 1; animation: shimmer 1.4s ease-in-out infinite; }
+  @keyframes shimmer { from { left: -60%; } to { left: 130%; } }
+  .bt-c:active, .bt-c.is-active { background: #000; }
+  .bt-c:disabled { background: #141413; cursor: progress; border-color: #4A4946; }
+  .bt-c:disabled::after { opacity: 0; animation: none; }
+  .bt-c:focus-visible, .bt-c.is-focus { outline: 3px solid #D97757; outline-offset: 2px; }
+
+  /* ============ D: ミニマル（地なし・黒セリフ・テラコッタ下線） ============ */
+  .bt-d { display: flex; align-items: center; justify-content: center; padding: 7px 16px 6px 10px; color: #141413;
+    background: transparent; border: none; border-bottom: 2px solid #D97757; border-radius: 2px;
+    cursor: pointer; font-weight: 600; font-size: 15px; letter-spacing: .04em;
+    font-family: "Tiempos Headline","Tiempos Text",Georgia,"Hiragino Mincho ProN","Yu Mincho",serif;
+    transition: background .2s, border-color .2s; }
+  .bt-d .sp { color: #D97757; width: 22px; height: 22px; }
+  .bt-d:hover:not(:disabled), .bt-d.is-hover { background: #FBEFE9; border-bottom-color: #141413; }
+  .bt-d:active, .bt-d.is-active { background: #F5DCD0; }
+  .bt-d:disabled { background: transparent; cursor: progress; border-bottom-style: dotted; }
+  .bt-d:focus-visible, .bt-d.is-focus { outline: 2px solid #141413; outline-offset: 3px; }
+
+  /* 動きの抑制（各案共通） */
+  @media (prefers-reduced-motion: reduce) {
+    .bt, .bt *, .bt::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<!-- スパーク共通定義（画像4の輪郭を手でトレースした近似。fill は currentColor） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="spark" viewBox="0 0 1280 1280">
+      <circle cx="665" cy="665" r="100" fill="currentColor"/>
+      <polygon fill="currentColor" points="428,160 468,165 485,180 510,235 548,322 630,482 640,515 650,525 655,450 665,370 672,260 676,230 692,194 721,174 745,186 764,212 749,308 713,497 722,497 737,487 772,435 838,352 900,285 921,267 963,267 992,312 980,358 908,450 852,526 820,580 828,584 940,560 1080,537 1113,553 1117,568 1104,601 1025,620 932,638 795,671 797,675 858,681 885,682 950,682 1070,690 1101,711 1120,738 1117,758 1069,781 850,730 796,716 790,717 791,720 835,762 910,830 1013,928 1019,950 1005,968 992,968 905,902 870,873 794,808 789,808 790,815 900,980 905,1024 897,1040 873,1047 846,1041 790,962 736,880 690,801 686,802 683,803 657,1093 644,1108 615,1119 591,1101 578,1071 590,1010 620,875 631,798 637,772 631,772 580,842 487,968 417,1043 400,1048 372,1034 375,1007 390,985 487,865 545,788 581,744 580,738 325,902 280,908 260,889 263,862 272,850 348,798 537,691 541,680 535,678 497,676 390,673 205,664 181,659 160,631 163,619 181,604 210,607 425,621 524,630 541,630 542,624 535,619 440,553 337,485 285,447 255,428 239,408 233,368 259,340 294,342 304,345 415,430 520,507 530,516 536,511 535,505 478,402 416,299 392,259 382,225 380,207 411,165"/>
+    </symbol>
+  </defs>
+</svg>
+<header>
+  <h1>生成ボタン Claude風 モックアップ（公式ロゴ寄せ / ai-writing-assistant-plugin）</h1>
+  <button class="tg on" id="tgPc" type="button">PC幅（内容幅）</button>
+  <button class="tg" id="tgSp" type="button">モバイル（幅100% / 390px）</button>
+</header>
+<main id="root">
+  <section>
+    <h2>公式ロゴ（参考）</h2>
+    <p>参考画像の再現ではなく、スパークSVG（手トレース）+ セリフ体テキストによる近似表示です。色: スパーク #D97757 / 文字 #141413 / 地 白。右は画像4相当（テラコッタ地 + 白スパーク）。</p>
+    <div class="logo-pair">
+      <div class="logo-ref"><svg viewBox="0 0 1280 1280" aria-hidden="true"><use href="#spark"/></svg><span>Claude</span></div>
+      <div class="logo-ref ground"><svg viewBox="0 0 1280 1280" aria-hidden="true"><use href="#spark"/></svg></div>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  var SPARK = '<svg class="sp" viewBox="0 0 1280 1280" aria-hidden="true"><use href="#spark"/></svg>';
+  var GEM = '<svg class="sp" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px;margin:0 8px 0 0">'
+    + '<path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="#fff"/></svg>';
+
+  var variants = [
+    { cls: 'bt-cur', name: '現行（Gemini・青グラデ）', desc: '比較用。', icon: GEM, label: 'Geminiでお知らせを作成' },
+    { cls: 'bt-a', name: 'A: テラコッタ地 + 白スパーク（画像4の踏襲・推奨）', desc: '#D97757 地。白文字は 3.1:1 で不足のため文字は #141413（約 5.9:1）。スパークは白。', icon: SPARK, label: 'Claudeでお知らせを作成' },
+    { cls: 'bt-b', name: 'B: 白地 + 黒セリフ + テラコッタのスパーク（画像3の踏襲・推奨）', desc: 'ロゴそのものの配色。黒の細枠ピル。ホバーでスパークが回る。', icon: SPARK, label: 'Claudeでお知らせを作成' },
+    { cls: 'bt-c', name: 'C: 黒地 + 白セリフ + テラコッタのスパーク', desc: '#141413 地。ホバーで枠がテラコッタ + シマー。', icon: SPARK, label: 'Claudeでお知らせを作成' },
+    { cls: 'bt-d', name: 'D: ミニマル（地なし・テラコッタ下線）', desc: 'ロゴ配色の軽量版。小さなスパークと下線。', icon: SPARK, label: 'Claudeでお知らせを作成' }
+  ];
+  var states = [
+    { t: '通常', c: '' },
+    { t: 'ホバー', c: ' is-hover' },
+    { t: '押下', c: ' is-active' },
+    { t: '無効（生成中）', c: '', dis: true },
+    { t: 'フォーカス', c: ' is-focus' }
+  ];
+  var html = variants.map(function (v) {
+    var cells = states.map(function (s) {
+      var label = s.dis ? '生成中…' : v.label;
+      return '<div class="cell"><small>' + s.t + '</small><div class="frame"><button type="button" class="bt ' + v.cls + s.c + '"'
+        + (s.dis ? ' disabled' : '') + '>' + v.icon + label + '</button></div></div>';
+    }).join('');
+    return '<section><h2>' + v.name + '</h2><p>' + v.desc + '</p><div class="row">' + cells + '</div></section>';
+  }).join('');
+  document.getElementById('root').insertAdjacentHTML('beforeend', html);
+
+  var pc = document.getElementById('tgPc'), sp = document.getElementById('tgSp');
+  function set(m) { document.body.classList.toggle('mobile', m); sp.classList.toggle('on', m); pc.classList.toggle('on', !m); }
+  pc.onclick = function () { set(false); };
+  sp.onclick = function () { set(true); };
+})();
+</script>
+</body>
+</html>

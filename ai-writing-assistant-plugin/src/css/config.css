@@ -292,6 +292,57 @@
   line-height: 1.6;
 }
 
+/* ボタンのデザイン選択（ボタン自体の見た目は button-designs.css） */
+#obp-btn-design-list .obp-bd-group {
+  margin: 12px 0 4px;
+  font-weight: bold;
+}
+
+#obp-btn-design-list .obp-bd-option {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: 8px 16px;
+  align-items: center;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border: 1px solid #e3e3e3;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+#obp-btn-design-list .obp-bd-option.is-selected {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.35);
+}
+
+#obp-btn-design-list .obp-bd-option-head {
+  display: block;
+}
+
+#obp-btn-design-list .obp-bd-option-desc {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#obp-btn-design-list .obp-bd-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed #ddd;
+  border-radius: 6px;
+  background: #f5f5f5;
+}
+
+@media (max-width: 600px) {
+  #obp-btn-design-list .obp-bd-option {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 600px) {
   .settings {
     padding: 12px;

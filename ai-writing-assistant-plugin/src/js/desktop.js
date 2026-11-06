@@ -9,6 +9,7 @@
   const router = window.AiProviderRouter;
   const piiMask = window.AiPiiMask;
   const loading = window.AIWritingLoading;
+  const design = window.AIWritingButtonDesign;
 
   const DEFAULT_PROMPT_DRAFT = `あなたはマンション管理組合への意見書作成システムです。
 以下の【メモ】を元に、「件名」と「本文」を作成し、必ず**JSON形式**のみで出力してください。
@@ -96,6 +97,8 @@
   })();
   const SPACE_RESTORE = config.space_restore || '';
   const LABEL_RESTORE = config.btn_label_restore || 'プロンプトを復元';
+  // ボタンのデザイン（'' は従来の青グラデーション。不正値も '' になる）。
+  const BUTTON_DESIGN = design.normalize(config.button_design);
 
   function renderTemplate(tpl, vars) {
     return String(tpl).replace(/\{\{(\w+)\}\}/g, (m, key) =>
@@ -174,8 +177,15 @@
       space.appendChild(buildPiiWarning());
 
       const btn = document.createElement('button');
-      btn.innerHTML = AI_LOGO_SVG + LABEL_DRAFT;
-      btn.style = BTN_STYLE;
+      if (BUTTON_DESIGN) {
+        design.apply(btn, BUTTON_DESIGN, LABEL_DRAFT, {
+          icon: true,
+          size: 'md',
+        });
+      } else {
+        btn.innerHTML = AI_LOGO_SVG + LABEL_DRAFT;
+        btn.style = BTN_STYLE;
+      }
       if (isMobile) {
         btn.style.width = '100%';
         btn.style.marginBottom = '10px';
@@ -204,9 +214,16 @@
     space.innerHTML = '';
 
     const btnSummary = document.createElement('button');
-    btnSummary.innerHTML = AI_LOGO_SVG + LABEL_SUMMARY;
-    btnSummary.style = BTN_STYLE;
-    btnSummary.style.padding = '8px 16px';
+    if (BUTTON_DESIGN) {
+      design.apply(btnSummary, BUTTON_DESIGN, LABEL_SUMMARY, {
+        icon: true,
+        size: 'sm',
+      });
+    } else {
+      btnSummary.innerHTML = AI_LOGO_SVG + LABEL_SUMMARY;
+      btnSummary.style = BTN_STYLE;
+      btnSummary.style.padding = '8px 16px';
+    }
     if (isMobile) {
       btnSummary.style.width = '100%';
       btnSummary.style.marginBottom = '10px';
@@ -812,8 +829,15 @@
     }
 
     const btn = document.createElement('button');
-    btn.textContent = LABEL_RESTORE;
-    btn.style = BTN_STYLE;
+    if (BUTTON_DESIGN) {
+      design.apply(btn, BUTTON_DESIGN, LABEL_RESTORE, {
+        icon: false,
+        size: 'md',
+      });
+    } else {
+      btn.textContent = LABEL_RESTORE;
+      btn.style = BTN_STYLE;
+    }
     if (isMobile) {
       btn.style.width = '100%';
       btn.style.marginBottom = '10px';
