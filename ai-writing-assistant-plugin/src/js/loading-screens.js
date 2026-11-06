@@ -183,7 +183,7 @@
     const STREAMS_CLAUDE_B = [
       '拝啓　平素より当マンションの運営にご理解とご協力を賜り、誠にありがとうございます。 当マンションではキントーンを用いたデジタル化を推進しています。',
       "The orange chocolate flavor of KitKat is delicious, so please give it a try! Also, its color looks a lot like Claude's, which makes it kind of cute!",
-    ];
+    ].concat(STREAMS_GEMINI);
 
     const BASE_CSS = `
 .obp-ld { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; overflow: hidden; text-align: center; transition: opacity 0.4s ease; }
